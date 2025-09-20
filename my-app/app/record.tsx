@@ -397,22 +397,21 @@ export default function Record() {
     try {
       const { saveStudySession } = await import("../firebase/studySessionService.js");
       
-      // Create session for TODAY at 5 PM
-      const today = new Date();
-      today.setHours(17, 0, 0, 0); // 5:00 PM today
+      // Create session for CURRENT TIME
+      const now = new Date();
       
-      // Create end time (6 PM) - 1 hour later
-      const endTime = new Date(today.getTime() + 3600000); // Add 1 hour (3600000 ms)
+      // Create end time - 1 hour later from current time
+      const endTime = new Date(now.getTime() + 3600000); // Add 1 hour (3600000 ms)
       
       const sessionData = {
         subject: "Test Study Session",
         userId: "current-user",
         duration: 3600, // 1 hour in seconds
-        notes: "Test session for Friday 5-6 PM",
+        notes: `Test session from ${now.toLocaleTimeString()} to ${endTime.toLocaleTimeString()}`,
         color: "#FF6B6B",
         isActive: false,
-        createdAt: today,
-        updatedAt: endTime
+        createdAt: now,
+        updatedAt: new Date(now.getTime() + 3600000) // now + 1 hour
       };
       
       const sessionId = await saveStudySession(sessionData);
@@ -523,7 +522,8 @@ export default function Record() {
                           top: getCurrentTimePosition(slot),
                           left: 0,
                           right: 0,
-                          height: 2
+                          height: 2,
+                          zIndex: 10 // Above session blocks
                         }
                       ]} />
                       
@@ -534,7 +534,8 @@ export default function Record() {
                           backgroundColor: "#007AFF",
                           position: 'absolute',
                           top: getCurrentTimePosition(slot) - 4, // 4px above the line
-                          left: -4 // Center the circle
+                          left: -4, // Center the circle
+                          zIndex: 10 // Above session blocks
                         }
                       ]} />
                       
@@ -545,7 +546,8 @@ export default function Record() {
                           backgroundColor: "#007AFF",
                           position: 'absolute',
                           top: getCurrentTimePosition(slot) - 8,
-                          right: 10
+                          right: 10,
+                          zIndex: 10 // Above session blocks
                         }
                       ]}>
                         {currentTime.toLocaleTimeString('en-US', { 
@@ -561,90 +563,67 @@ export default function Record() {
 
 
 
-                  {/* Test purple line at 4:30 PM, 0px down */}
+
+                  {/* Test session block 4:31-4:33 PM */}
                   {slot.hour === 16 && slot.minute === 30 && (
-                    <>
-                      {/* Purple line at exact position */}
-                      <View style={[
-                        styles.currentTimeLine,
-                        { 
-                          backgroundColor: "#8B5CF6",
-                          position: 'absolute',
-                          top: 0,
-                          left: 0,
-                          right: 0,
-                          height: 2
-                        }
-                      ]} />
-                      
-                      {/* Purple circle above the line */}
-                      <View style={[
-                        styles.currentTimeDot,
-                        { 
-                          backgroundColor: "#8B5CF6",
-                          position: 'absolute',
-                          top: -4, // 4px above the line
-                          left: -4 // Center the circle
-                        }
-                      ]} />
-                    </>
+                    <View style={[
+                      styles.sessionBlock,
+                      {
+                        backgroundColor: "#FF6B6B",
+                        height: 2, // 2 minutes = 4px, but let's make it 2px for a thin line
+                        top: 2, // 1 minute into slot (1 × 2px = 2px)
+                        left: 0,
+                        right: 0,
+                      }
+                    ]}>
+                      <Text style={styles.sessionText}>Test 4:31-4:33</Text>
+                      <Text style={styles.sessionTime}>4:31 PM - 4:33 PM</Text>
+                    </View>
                   )}
 
-                  {/* Start time line indicators for all sessions */}
-                  {studySessions.map((session, index) => {
+                  {/* Study session blocks - only render at the start of each session */}
+                  {session && minute === 0 && (() => {
                     const sessionStart = session.createdAt?.toDate ? session.createdAt.toDate() : new Date(session.createdAt);
-                    const sessionHour = sessionStart.getHours();
-                    const sessionMinute = sessionStart.getMinutes();
-                    const sessionTimeInMinutes = sessionHour * 60 + sessionMinute;
+                    const sessionEnd = session.updatedAt?.toDate ? session.updatedAt.toDate() : new Date(session.updatedAt);
                     
-                    // Check if this session starts in the current time slot
-                    const slotTimeInMinutes = hour * 60 + minute;
-                    const isInCurrentSlot = sessionTimeInMinutes >= slotTimeInMinutes && 
-                      sessionTimeInMinutes < slotTimeInMinutes + 30;
+                    // Calculate the duration and height
+                    const durationMs = sessionEnd.getTime() - sessionStart.getTime();
+                    const durationMinutes = durationMs / (1000 * 60);
+                    const heightInPixels = durationMinutes * getPixelsPerMinute();
                     
-                    if (!isInCurrentSlot) return null;
+                    // Calculate position within the current time slot
+                    const slotStartTime = new Date(selectedDate);
+                    slotStartTime.setHours(hour, minute, 0, 0);
+                    const minutesIntoSlot = (sessionStart.getTime() - slotStartTime.getTime()) / (1000 * 60);
+                    const topPosition = minutesIntoSlot * getPixelsPerMinute();
                     
-                    
-                    // Calculate exact position within the 30-minute slot using same calculation as current time
-                    const minutesWithinSlot = sessionTimeInMinutes - slotTimeInMinutes;
-                    const topPosition = minutesWithinSlot * getPixelsPerMinute();
-                    
-                    // Session positioning (no logging)
-
-  return (
-                      <>
-                        {/* Session line at exact position */}
-                        <View 
-                          key={`session-line-${index}`}
-                          style={[
-                            styles.currentTimeLine,
-                            { 
-                              backgroundColor: "#FF3B30",
-                              position: 'absolute',
-                              top: topPosition,
-                              left: 0,
-                              right: 0,
-                              height: 2
-                            }
-                          ]} 
-                        />
-                        
-                        {/* Session circle above the line */}
-                        <View 
-                          key={`session-dot-${index}`}
-                          style={[
-                            styles.currentTimeDot,
-                            { 
-                              backgroundColor: "#FF3B30",
-                              position: 'absolute',
-                              top: topPosition - 4, // 4px above the line
-                              left: -4 // Center the circle
-                            }
-                          ]} 
-                        />
-                      </>
+                    return (
+                      <View style={[
+                        styles.sessionBlock,
+                        {
+                          backgroundColor: session.color || "#2D5A27",
+                          height: heightInPixels, // Use actual calculated height
+                          top: topPosition, // Position based on exact start time
+                          left: 0,
+                          right: 0,
+                        }
+                      ]}>
+                        <Text style={styles.sessionText}>{session.subject}</Text>
+                        <Text style={styles.sessionTime}>
+                          {sessionStart.toLocaleTimeString('en-US', { 
+                            hour: 'numeric', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })} - {sessionEnd.toLocaleTimeString('en-US', { 
+                            hour: 'numeric', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })}
+                        </Text>
+                      </View>
                     );
-                  })}
+                  })()}
+
                   
                 </View>
               </View>
@@ -656,15 +635,30 @@ export default function Record() {
       {/* Test Button */}
       <View style={styles.testButtonContainer}>
         <TouchableOpacity style={styles.testButton} onPress={addTestSession}>
-          <Text style={styles.testButtonText}>Add Test Session (Today 5-6 PM)</Text>
+          <Text style={styles.testButtonText}>Add Test Session (Current Time + 1hr)</Text>
         </TouchableOpacity>
       </View>
 
       {/* Legend */}
       <View style={styles.legend}>
-        <Text style={styles.legendTitle}>
-          {isToday ? "Today's Sessions" : `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Sessions`}
-        </Text>
+        <View style={styles.legendHeader}>
+          <Text style={styles.legendTitle}>
+            {isToday ? "Today's Sessions" : `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Sessions`}
+          </Text>
+          <TouchableOpacity 
+            style={[
+              styles.recordButton,
+              isRecording && styles.recordingButton
+            ]}
+            onPress={() => setShowRecordModal(true)}
+          >
+            <Ionicons 
+              name={isRecording ? "stop" : "add"} 
+              size={20} 
+              color="white" 
+            />
+          </TouchableOpacity>
+        </View>
         
         {studySessions.length > 0 ? (
           studySessions.map((session) => (
@@ -681,20 +675,6 @@ export default function Record() {
         )}
       </View>
 
-      {/* Floating Plus Button */}
-      <TouchableOpacity 
-        style={[
-          styles.floatingButton,
-          isRecording && styles.recordingButton
-        ]}
-        onPress={() => setShowRecordModal(true)}
-      >
-        <Ionicons 
-          name={isRecording ? "stop" : "add"} 
-          size={28} 
-          color="white" 
-        />
-      </TouchableOpacity>
 
       {/* Record Modal */}
       <Modal
@@ -957,11 +937,29 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#E5E5EA",
   },
+  legendHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 15,
+  },
   legendTitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#000",
-    marginBottom: 15,
+  },
+  recordButton: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    backgroundColor: "#2D5A27",
+    justifyContent: "center",
+    alignItems: "center",
+    shadowColor: "#2D5A27",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 5,
   },
   legendItem: {
     flexDirection: "row",
@@ -990,23 +988,6 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     textAlign: "center",
     marginTop: 10,
-  },
-  // Floating button
-  floatingButton: {
-    position: "absolute",
-    bottom: 30,
-    right: 20,
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: "#2D5A27",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#2D5A27",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 8,
   },
   recordingButton: {
     backgroundColor: "#FF3B30", // Red color when recording

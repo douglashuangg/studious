@@ -21,8 +21,10 @@ export const saveStudySession = async (sessionData) => {
   try {
     const docRef = await addDoc(collection(db, STUDY_SESSIONS_COLLECTION), {
       ...sessionData,
-      createdAt: new Date(),
-      updatedAt: new Date(),
+      // Use the provided createdAt and updatedAt timestamps
+      // Only set current time if not provided
+      createdAt: sessionData.createdAt || new Date(),
+      updatedAt: sessionData.updatedAt || new Date(),
     });
     console.log("Study session saved with ID: ", docRef.id);
     return docRef.id;
