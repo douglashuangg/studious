@@ -1,6 +1,7 @@
 import { Text, View, StyleSheet, ScrollView, Dimensions, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect, useRef } from "react";
+import { getStudySessions as loadStudySessionsFromFirebase } from "../firebase/studySessionService.js";
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -9,6 +10,7 @@ export default function Calendar() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const scrollViewRef = useRef<ScrollView>(null);
   const [scrollPosition, setScrollPosition] = useState(0);
+  const [studySessions, setStudySessions] = useState([]);
 
   useEffect(() => {
     const timer = setInterval(() => {
@@ -17,6 +19,48 @@ export default function Calendar() {
 
     return () => clearInterval(timer);
   }, []);
+
+  // Load study sessions from Firebase
+  useEffect(() => {
+    loadStudySessions();
+  }, [selectedDate]);
+
+  const loadStudySessions = async () => {
+    try {
+      const sessions = await loadStudySessionsFromFirebase();
+      setStudySessions(sessions);
+      console.log("=== CALENDAR DEBUG ===");
+      console.log("Total sessions loaded:", sessions.length);
+      console.log("All sessions:", sessions);
+      console.log("Selected date:", selectedDate.toDateString());
+      
+      sessions.forEach((session, index) => {
+        console.log(`Session ${index}:`, {
+          id: session.id,
+          subject: session.subject,
+          startTime: session.startTime,
+          startTimeType: typeof session.startTime,
+          startTimeDate: new Date(session.startTime),
+          startTimeString: new Date(session.startTime).toDateString()
+        });
+      });
+      
+      const filteredSessions = sessions.filter(session => {
+        const sessionDate = new Date(session.startTime);
+        const matches = sessionDate.toDateString() === selectedDate.toDateString();
+        console.log("Date comparison:", {
+          sessionDate: sessionDate.toDateString(),
+          selectedDate: selectedDate.toDateString(),
+          matches: matches
+        });
+        return matches;
+      });
+      
+      console.log("Filtered sessions for selected date:", filteredSessions);
+    } catch (error) {
+      console.error("Error loading study sessions:", error);
+    }
+  };
 
   // Generate time slots for the day (24 hours)
   const generateTimeSlots = () => {
@@ -63,12 +107,16 @@ export default function Calendar() {
   };
 
   const formatDate = (date: Date) => {
-    return date.toLocaleDateString('en-US', { 
-      weekday: 'long',
-      month: 'long',
-      day: 'numeric',
-      year: 'numeric'
-    });
+    const days = ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Friday', 'Saturday'];
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 
+                   'July', 'August', 'September', 'October', 'November', 'December'];
+    
+    const dayName = days[date.getDay()];
+    const monthName = months[date.getMonth()];
+    const day = date.getDate();
+    const year = date.getFullYear();
+    
+    return `${dayName}, ${monthName} ${day}, ${year}`;
   };
 
   const isCurrentTime = (slot: Date) => {
@@ -90,41 +138,40 @@ export default function Calendar() {
     setSelectedDate(newDate);
   };
 
-  const goToToday = () => {
-    setSelectedDate(new Date());
+
+  const getStudySessionsForDate = () => {
+    // Filter sessions for the selected date
+    const selectedDateString = selectedDate.toDateString();
+    const filteredSessions = studySessions.filter(session => {
+      const sessionDate = new Date(session.startTime);
+      const sessionDateString = sessionDate.toDateString();
+      console.log("Comparing dates:", {
+        selected: selectedDateString,
+        session: sessionDateString,
+        matches: sessionDateString === selectedDateString
+      });
+      return sessionDateString === selectedDateString;
+    });
+    console.log("Filtered sessions for date:", filteredSessions);
+    return filteredSessions;
   };
 
-  const getStudySessions = () => {
-    // Mock study sessions data - different sessions for different days
-    const sessionsByDate = {
-      [new Date().toDateString()]: [
-        { id: 1, subject: "Mathematics", startTime: 9, endTime: 10.5, color: "#FF6B6B" },
-        { id: 2, subject: "Programming", startTime: 14, endTime: 16, color: "#4ECDC4" },
-        { id: 3, subject: "Physics", startTime: 19, endTime: 20.5, color: "#45B7D1" },
-      ],
-      [new Date(Date.now() - 24 * 60 * 60 * 1000).toDateString()]: [
-        { id: 4, subject: "Chemistry", startTime: 10, endTime: 11.5, color: "#96CEB4" },
-        { id: 5, subject: "Biology", startTime: 15, endTime: 17, color: "#FFEAA7" },
-      ],
-      [new Date(Date.now() + 24 * 60 * 60 * 1000).toDateString()]: [
-        { id: 6, subject: "History", startTime: 8, endTime: 9.5, color: "#DDA0DD" },
-        { id: 7, subject: "Literature", startTime: 13, endTime: 14.5, color: "#98D8C8" },
-      ]
-    };
-    
-    return sessionsByDate[selectedDate.toDateString()] || [];
-  };
-
-  const studySessions = getStudySessions();
+  const sessionsForDate = getStudySessionsForDate();
 
   const getSessionForTime = (hour: number, minute: number) => {
     const timeInHours = hour + minute / 60;
-    return studySessions.find(session => 
-      timeInHours >= session.startTime && timeInHours <= session.endTime
-    );
+    return sessionsForDate.find(session => {
+      const startHour = new Date(session.startTime).getHours();
+      const startMinute = new Date(session.startTime).getMinutes();
+      const endHour = new Date(session.endTime).getHours();
+      const endMinute = new Date(session.endTime).getMinutes();
+      const sessionStartTime = startHour + startMinute / 60;
+      const sessionEndTime = endHour + endMinute / 60;
+      
+      return timeInHours >= sessionStartTime && timeInHours <= sessionEndTime;
+    });
   };
 
-  const isToday = selectedDate.toDateString() === new Date().toDateString();
 
   return (
     <View style={styles.container}>
@@ -137,11 +184,9 @@ export default function Calendar() {
         <View style={styles.dateContainer}>
           <Text style={styles.title}>Study Calendar</Text>
           <Text style={styles.dateText}>{formatDate(selectedDate)}</Text>
-          {!isToday && (
-            <TouchableOpacity onPress={goToToday} style={styles.todayButton}>
-              <Text style={styles.todayButtonText}>Today</Text>
-            </TouchableOpacity>
-          )}
+          <TouchableOpacity onPress={loadStudySessions} style={styles.refreshButton}>
+            <Ionicons name="refresh" size={16} color="#2D5A27" />
+          </TouchableOpacity>
         </View>
         
         <TouchableOpacity onPress={goToNextDay} style={styles.navButton}>
@@ -163,7 +208,7 @@ export default function Calendar() {
             const hour = slot.getHours();
             const minute = slot.getMinutes();
             const session = getSessionForTime(hour, minute);
-            const isCurrent = isCurrentTime(slot) && isToday;
+            const isCurrent = isCurrentTime(slot);
             const isHalfHour = minute === 30;
 
             return (
@@ -192,50 +237,94 @@ export default function Calendar() {
                   )}
 
                   {/* Study session block */}
-                  {session && minute === 0 && (
-                    <View style={[
-                      styles.sessionBlock,
-                      { 
-                        backgroundColor: session.color,
-                        height: (session.endTime - session.startTime) * 60,
-                        top: 0
-                      }
-                    ]}>
-                      <Text style={styles.sessionText}>{session.subject}</Text>
-                      <Text style={styles.sessionTime}>
-                        {Math.floor(session.startTime)}:00 - {Math.floor(session.endTime)}:30
-                      </Text>
-                    </View>
-                  )}
+                  {session && minute === 0 && (() => {
+                    const startTime = new Date(session.startTime);
+                    const endTime = new Date(session.endTime);
+                    const startHour = startTime.getHours();
+                    const startMinute = startTime.getMinutes();
+                    const endHour = endTime.getHours();
+                    const endMinute = endTime.getMinutes();
+                    
+                    const startTimeInHours = startHour + startMinute / 60;
+                    const endTimeInHours = endHour + endMinute / 60;
+                    const durationInHours = endTimeInHours - startTimeInHours;
+                    const heightInPixels = Math.max(durationInHours * 60, 30); // Minimum 30px height
+                    
+                    console.log("Rendering session block:", {
+                      subject: session.subject,
+                      startTime: startTime.toLocaleTimeString(),
+                      endTime: endTime.toLocaleTimeString(),
+                      height: heightInPixels,
+                      hour: hour,
+                      minute: minute
+                    });
+                    
+                    return (
+                      <View style={[
+                        styles.sessionBlock,
+                        { 
+                          backgroundColor: session.color,
+                          height: heightInPixels,
+                          top: 0
+                        }
+                      ]}>
+                        <Text style={styles.sessionText}>{session.subject}</Text>
+                        <Text style={styles.sessionTime}>
+                          {startTime.toLocaleTimeString('en-US', { 
+                            hour: 'numeric', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })} - {endTime.toLocaleTimeString('en-US', { 
+                            hour: 'numeric', 
+                            minute: '2-digit',
+                            hour12: true 
+                          })}
+                        </Text>
+                      </View>
+                    );
+                  })()}
                 </View>
               </View>
             );
           })}
         </ScrollView>
 
-        {/* Current time line overlay - only show for today */}
-        {isToday && (
-          <View style={styles.currentTimeOverlay}>
-            <View style={styles.currentTimeLineOverlay} />
-          </View>
-        )}
+        {/* Current time line overlay */}
+        <View style={styles.currentTimeOverlay}>
+          <View style={styles.currentTimeLineOverlay} />
+        </View>
       </View>
 
       {/* Legend */}
       <View style={styles.legend}>
         <Text style={styles.legendTitle}>
-          {isToday ? "Today's Sessions" : `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Sessions`}
+          {`${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Sessions`}
         </Text>
-        {studySessions.length > 0 ? (
-          studySessions.map((session) => (
-            <View key={session.id} style={styles.legendItem}>
-              <View style={[styles.legendColor, { backgroundColor: session.color }]} />
-              <Text style={styles.legendText}>{session.subject}</Text>
-              <Text style={styles.legendTime}>
-                {Math.floor(session.startTime)}:00 - {Math.floor(session.endTime)}:30
-              </Text>
-            </View>
-          ))
+        {sessionsForDate.length > 0 ? (
+          sessionsForDate.map((session) => {
+            const startTime = new Date(session.startTime);
+            const endTime = new Date(session.endTime);
+            const startTimeStr = startTime.toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit',
+              hour12: true 
+            });
+            const endTimeStr = endTime.toLocaleTimeString('en-US', { 
+              hour: 'numeric', 
+              minute: '2-digit',
+              hour12: true 
+            });
+            
+            return (
+              <View key={session.id} style={styles.legendItem}>
+                <View style={[styles.legendColor, { backgroundColor: session.color }]} />
+                <Text style={styles.legendText}>{session.subject}</Text>
+                <Text style={styles.legendTime}>
+                  {startTimeStr} - {endTimeStr}
+                </Text>
+              </View>
+            );
+          })
         ) : (
           <Text style={styles.noSessionsText}>No study sessions scheduled for this day</Text>
         )}
@@ -279,16 +368,15 @@ const styles = StyleSheet.create({
     color: "#666",
     marginBottom: 8,
   },
-  todayButton: {
-    backgroundColor: "#2D5A27",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
+  dateButtons: {
+    flexDirection: "row",
+    alignItems: "center",
+    gap: 8,
   },
-  todayButtonText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "600",
+  refreshButton: {
+    backgroundColor: "#f0f0f0",
+    padding: 8,
+    borderRadius: 8,
   },
   calendarContainer: {
     flex: 1,

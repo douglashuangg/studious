@@ -47,7 +47,7 @@ export default function RootLayout() {
       <Tabs.Screen
         name="calendar"
         options={{
-          href: null, // Hide from tab bar - functionality moved to record tab
+          href: null, // Hide from tab bar - functionality moved to Study tab
         }}
       />
       <Tabs.Screen

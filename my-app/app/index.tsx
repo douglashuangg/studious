@@ -1,9 +1,59 @@
 import { Text, View, StyleSheet, ScrollView, Image, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useEffect, useState } from "react";
+import app from "../firebase/firebaseInit.js";
+import { saveStudySession, getActiveStudySessions } from "../firebase/studySessionService.js";
 
 export default function Index() {
   const router = useRouter();
+  const [firebaseStatus, setFirebaseStatus] = useState("Checking...");
+  const [realStudySessions, setRealStudySessions] = useState([]);
+  
+  useEffect(() => {
+    // Test Firebase connection
+    if (app) {
+      setFirebaseStatus("✅ Firebase Connected!");
+      console.log("Firebase app initialized:", app.name);
+      
+      // Load real study sessions from database
+      loadStudySessionsFromFirebase();
+    } else {
+      setFirebaseStatus("❌ Firebase Failed");
+    }
+  }, []);
+
+  const loadStudySessionsFromFirebase = async () => {
+    try {
+      const sessions = await getActiveStudySessions();
+      setRealStudySessions(sessions);
+      console.log("Loaded study sessions:", sessions);
+    } catch (error) {
+      console.error("Error loading study sessions:", error);
+    }
+  };
+
+  const testSaveStudySession = async () => {
+    try {
+      const testSession = {
+        userId: "test-user-123",
+        userName: "Test User",
+        subject: "Mathematics",
+        startTime: new Date(),
+        isActive: true,
+        duration: "2h 15m",
+        avatar: "https://via.placeholder.com/60x60/FF6B6B/FFFFFF?text=T"
+      };
+      
+      const sessionId = await saveStudySession(testSession);
+      console.log("Test session saved with ID:", sessionId);
+      
+      // Reload sessions to show the new one
+      loadStudySessionsFromFirebase();
+    } catch (error) {
+      console.error("Error saving test session:", error);
+    }
+  };
   
   // Mock data for currently studying stories
   const studyingStories = [
@@ -144,6 +194,20 @@ export default function Index() {
 
   return (
     <ScrollView style={styles.container}>
+      {/* Firebase Status Indicator */}
+      <View style={styles.firebaseStatus}>
+        <Text style={styles.firebaseStatusText}>{firebaseStatus}</Text>
+        <Text style={styles.firebaseStatusText}>
+          DB Sessions: {realStudySessions.length}
+        </Text>
+        <TouchableOpacity 
+          style={styles.testButton} 
+          onPress={testSaveStudySession}
+        >
+          <Text style={styles.testButtonText}>Test Save Session</Text>
+        </TouchableOpacity>
+      </View>
+      
       {/* Stories Section */}
       <View style={styles.storiesContainer}>
         <Text style={styles.storiesTitle}>Currently Studying</Text>
@@ -291,6 +355,30 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#f8f9fa",
   },
+  firebaseStatus: {
+    backgroundColor: "#E8F5E8",
+    padding: 8,
+    margin: 10,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  firebaseStatusText: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#2D5A27",
+  },
+  testButton: {
+    backgroundColor: "#4CAF50",
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    borderRadius: 6,
+    marginTop: 8,
+  },
+  testButtonText: {
+    color: "white",
+    fontSize: 12,
+    fontWeight: "600",
+  },
   header: {
     alignItems: "center",
     paddingVertical: 20,
@@ -435,6 +523,11 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   refreshButton: {
+    padding: 8,
+    backgroundColor: "#f0f0f0",
+    borderRadius: 8,
+  },
+  settingsButton: {
     padding: 8,
     backgroundColor: "#f0f0f0",
     borderRadius: 8,

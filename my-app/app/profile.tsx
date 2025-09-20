@@ -6,17 +6,31 @@ export default function Profile() {
   const router = useRouter();
   return (
     <ScrollView style={styles.container}>
-      {/* Header with Profile Picture */}
+      {/* Header with Profile Picture and Followers/Following */}
       <View style={styles.header}>
-        <View style={styles.profilePictureContainer}>
-          <Image
-            source={{ uri: "https://via.placeholder.com/120x120/007AFF/FFFFFF?text=U" }}
-            style={styles.profilePicture}
-          />
-          <TouchableOpacity style={styles.editButton}>
-            <Ionicons name="camera" size={20} color="#007AFF" />
-          </TouchableOpacity>
+        <View style={styles.profileSection}>
+          <View style={styles.profilePictureContainer}>
+            <Image
+              source={{ uri: "https://via.placeholder.com/120x120/007AFF/FFFFFF?text=U" }}
+              style={styles.profilePicture}
+            />
+            <TouchableOpacity style={styles.editButton}>
+              <Ionicons name="camera" size={20} color="#007AFF" />
+            </TouchableOpacity>
+          </View>
+          
+          <View style={styles.followContainer}>
+            <TouchableOpacity style={styles.followItem} onPress={() => router.push("/followers")}>
+              <Text style={styles.followNumber}>12</Text>
+              <Text style={styles.followLabel}>Followers</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.followItem} onPress={() => router.push("/following")}>
+              <Text style={styles.followNumber}>12</Text>
+              <Text style={styles.followLabel}>Following</Text>
+            </TouchableOpacity>
+          </View>
         </View>
+        
         <Text style={styles.name}>John Doe</Text>
         <Text style={styles.username}>@johndoe</Text>
         <Text style={styles.bio}>Computer Science Student | Study Enthusiast</Text>
@@ -40,25 +54,13 @@ export default function Profile() {
         </View>
       </View>
 
-      {/* Followers/Following */}
-      <View style={styles.followContainer}>
-        <TouchableOpacity style={styles.followItem} onPress={() => router.push("/followers")}>
-          <Text style={styles.followNumber}>12</Text>
-          <Text style={styles.followLabel}>Followers</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.followItem} onPress={() => router.push("/following")}>
-          <Text style={styles.followNumber}>12</Text>
-          <Text style={styles.followLabel}>Following</Text>
-        </TouchableOpacity>
-      </View>
-
       {/* Action Buttons */}
       <View style={styles.actionsContainer}>
         <TouchableOpacity style={styles.editProfileButton}>
           <Text style={styles.editProfileText}>Edit Profile</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.settingsButton}>
-          <Ionicons name="settings" size={24} color="#007AFF" />
+          <Ionicons name="settings" size={24} color="#2D5A27" />
         </TouchableOpacity>
       </View>
 
@@ -181,18 +183,24 @@ const styles = StyleSheet.create({
     backgroundColor: "#E5E5EA",
     marginVertical: 10,
   },
+  profileSection: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 20,
+  },
   followContainer: {
     flexDirection: "row",
     backgroundColor: "#ffffff",
-    marginHorizontal: 20,
-    marginTop: 20,
+    marginLeft: 20,
     borderRadius: 12,
     paddingVertical: 20,
+    paddingHorizontal: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 4,
     elevation: 3,
+    flex: 1,
   },
   followItem: {
     flex: 1,

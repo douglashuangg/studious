@@ -41,3 +41,6 @@ app-example
 # generated native folders
 /ios
 /android
+
+# Firebase config (contains sensitive API keys)
+firebase/firebaseInit.js
