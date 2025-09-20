@@ -1,16 +1,19 @@
 import { Text, View, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert, Modal, Dimensions } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect, useRef } from "react";
+import { saveStudySession } from "../firebase/studySessionService.js";
 
 const { height: screenHeight } = Dimensions.get('window');
 
 export default function Record() {
   // Recording states
   const [isRecording, setIsRecording] = useState(false);
+  const [timeSlotHeight, setTimeSlotHeight] = useState(60); // Default height
   const [isPaused, setIsPaused] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [subject, setSubject] = useState("");
   const [notes, setNotes] = useState("");
+  const [sessionStartTime, setSessionStartTime] = useState(null);
   
   // Calendar states
   const [currentTime, setCurrentTime] = useState(new Date());
@@ -39,6 +42,32 @@ export default function Record() {
     return () => clearInterval(timer);
   }, []);
 
+  // Auto-scroll to current time only when component first mounts
+  useEffect(() => {
+    if (scrollViewRef.current && timeSlotHeight > 0) {
+      const currentHour = currentTime.getHours();
+      const currentMinute = currentTime.getMinutes();
+      
+      // Calculate which time slot the current time falls into
+      // Each hour has 2 slots: :00-:30 and :30-:60
+      const slotIndex = currentHour * 2 + (currentMinute >= 30 ? 1 : 0);
+      
+      // Calculate scroll position (each time slot is timeSlotHeight pixels)
+      const scrollPosition = slotIndex * timeSlotHeight;
+      
+      console.log(`Auto-scroll: Current time ${currentHour}:${currentMinute.toString().padStart(2, '0')}, Slot index: ${slotIndex}, Scroll position: ${scrollPosition}px`);
+      
+      // Scroll to current time with some offset to center it
+      setTimeout(() => {
+        scrollViewRef.current?.scrollTo({
+          y: Math.max(0, scrollPosition - 200), // Offset to show some context above
+          animated: true
+        });
+      }, 100); // Small delay to ensure layout is complete
+    }
+  }, [timeSlotHeight]); // Only trigger when timeSlotHeight changes (initial load)
+
+
   const formatTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600);
     const minutes = Math.floor((totalSeconds % 3600) / 60);
@@ -50,6 +79,75 @@ export default function Record() {
     return `${minutes}:${secs.toString().padStart(2, '0')}`;
   };
 
+  const formatSessionTime = (timeInHours: number) => {
+    // Handle invalid or undefined time values
+    if (!timeInHours || isNaN(timeInHours)) {
+      return "Invalid time";
+    }
+    
+    const hours = Math.floor(timeInHours);
+    const minutes = Math.round((timeInHours - hours) * 60);
+    const date = new Date();
+    date.setHours(hours, minutes, 0, 0);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const formatFirebaseTime = (firebaseTimestamp: any) => {
+    if (!firebaseTimestamp) return "Unknown time";
+    
+    const date = firebaseTimestamp?.toDate ? firebaseTimestamp.toDate() : new Date(firebaseTimestamp);
+    return date.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const formatFirebaseEndTime = (firebaseTimestamp: any, duration: number) => {
+    if (!firebaseTimestamp || !duration) return "Unknown end";
+    
+    const startDate = firebaseTimestamp?.toDate ? firebaseTimestamp.toDate() : new Date(firebaseTimestamp);
+    const endDate = new Date(startDate.getTime() + (duration * 1000)); // duration in seconds
+    
+    return endDate.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+  };
+
+  const calculateSessionHeight = (session: any) => {
+    // Calculate actual duration from Firebase timestamps
+    const sessionStart = session.createdAt?.toDate ? session.createdAt.toDate() : new Date(session.createdAt);
+    const sessionEnd = session.updatedAt?.toDate ? session.updatedAt.toDate() : new Date(session.updatedAt);
+    
+    const durationMs = sessionEnd.getTime() - sessionStart.getTime();
+    const durationMinutes = durationMs / (1000 * 60);
+    
+    // Use consistent time slot dimensions: 60px for 30 minutes = 2px per minute
+    const height = durationMinutes * getPixelsPerMinute();
+    
+    return Math.max(height, 20); // Minimum 20px so it's visible
+  };
+
+  const calculateSessionTop = (session: any) => {
+    // Use actual Firebase timestamp
+    const sessionStart = session.createdAt?.toDate ? session.createdAt.toDate() : new Date(session.createdAt);
+    const startHour = sessionStart.getHours();
+    const startMinute = sessionStart.getMinutes();
+    
+    // Calculate position within the current time slot
+    // Use consistent time slot dimensions: 60px for 30 minutes = 2px per minute
+    const minutesWithinSlot = startMinute % 30; // Minutes within the 30-minute slot
+    const topPosition = minutesWithinSlot * getPixelsPerMinute(); // Use consistent calculation
+    
+    return topPosition;
+  };
+
   const handleStart = () => {
     if (!subject.trim()) {
       Alert.alert("Subject Required", "Please enter a subject for your study session.");
@@ -58,6 +156,7 @@ export default function Record() {
     
     if (!isRecording) {
       setSeconds(0);
+      setSessionStartTime(new Date()); // Record the start time
     }
     setIsRecording(true);
     setIsPaused(false);
@@ -68,28 +167,58 @@ export default function Record() {
   };
 
   const handleStop = () => {
-    if (seconds >= 60) {
+    // Always show confirmation when stopping recording
       Alert.alert(
-        "Session Complete",
-        `Study session completed!\nDuration: ${formatTime(seconds)}\nSubject: ${subject}`,
-        [
-          {
-            text: "Save",
-            onPress: () => {
-              console.log("Session saved:", { subject, duration: seconds, notes });
+      "Stop Recording",
+      `Do you want to save this study session?\n\nDuration: ${formatTime(seconds)}\nSubject: ${subject || "No subject"}`,
+      [
+        {
+          text: "Save Session",
+          onPress: async () => {
+            if (seconds >= 60) {
+              try {
+                const sessionEndTime = new Date();
+                const sessionData = {
+                  userId: "current-user", // You can replace this with actual user ID
+                  userName: "Current User", // You can replace this with actual user name
+                  subject: subject,
+                  startTime: sessionStartTime,
+                  endTime: sessionEndTime,
+                  duration: formatTime(seconds),
+                  notes: notes,
+                  isActive: false, // Session is completed
+                  color: "#2D5A27" // Default color
+                };
+                
+                await saveStudySession(sessionData);
+                // Session saved
+                Alert.alert("Success", "Study session saved successfully!");
+              } catch (error) {
+                console.error("Error saving session:", error);
+                Alert.alert("Error", "Failed to save study session. Please try again.");
+              }
+            } else {
+              Alert.alert("Session Too Short", "Study session must be at least 1 minute to save.");
+            }
               resetSession();
             }
           },
           {
             text: "Discard",
-            onPress: resetSession,
+          onPress: () => {
+            Alert.alert("Discarded", "Study session discarded.");
+            resetSession();
+          },
             style: "destructive"
+        },
+        {
+          text: "Continue Recording",
+          onPress: () => {
+            // Do nothing - just close the dialog and continue recording
           }
-        ]
-      );
-    } else {
-      resetSession();
-    }
+        }
+      ]
+    );
   };
 
   const resetSession = () => {
@@ -98,16 +227,31 @@ export default function Record() {
     setSeconds(0);
     setSubject("");
     setNotes("");
+    setSessionStartTime(null);
   };
 
   // Calendar helper functions
   const generateTimeSlots = () => {
     const slots = [];
     for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) {
-        const time = new Date(selectedDate);
-        time.setHours(hour, minute, 0, 0);
-        slots.push(time);
+      for (let minute = 0; minute < 60; minute += 30) { // Every 30 minutes
+        const startTime = new Date(selectedDate);
+        startTime.setHours(hour, minute, 0, 0);
+        
+        const endTime = new Date(selectedDate);
+        if (minute === 30) {
+          endTime.setHours(hour + 1, 0, 0, 0);
+        } else {
+          endTime.setHours(hour, 30, 0, 0);
+        }
+        
+        slots.push({
+          startTime,
+          endTime,
+          hour,
+          minute,
+          displayTime: startTime // For display purposes
+        });
       }
     }
     return slots;
@@ -135,11 +279,66 @@ export default function Record() {
     });
   };
 
-  const isCurrentTime = (slot: Date) => {
-    const slotHour = slot.getHours();
-    const slotMinute = slot.getMinutes();
+  const isCurrentTime = (slot: any) => {
+    const slotHour = slot.hour;
+    const slotMinute = slot.minute;
     const slotTimeInMinutes = slotHour * 60 + slotMinute;
-    return Math.abs(slotTimeInMinutes - currentTimeInMinutes) <= 15;
+    
+    // Check if current time falls within this 30-minute slot
+    const currentHour = currentTime.getHours();
+    const currentMinute = currentTime.getMinutes();
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+    
+    const isCurrent = currentTimeInMinutes >= slotTimeInMinutes && 
+           currentTimeInMinutes < slotTimeInMinutes + 30;
+    
+    // Debug logging for 4:30 slot specifically
+    if (slotHour === 16 && slotMinute === 30) {
+      console.log(`🔍 isCurrentTime debug for ${slotHour}:${slotMinute.toString().padStart(2, '0')}:`);
+      console.log(`   Current time: ${currentHour}:${currentMinute.toString().padStart(2, '0')} (${currentTimeInMinutes} minutes)`);
+      console.log(`   Slot time: ${slotHour}:${slotMinute.toString().padStart(2, '0')} (${slotTimeInMinutes} minutes)`);
+      console.log(`   Is current: ${isCurrent}`);
+      if (isCurrent) {
+        const minutesIntoSlot = currentTimeInMinutes - slotTimeInMinutes;
+        const expectedPosition = minutesIntoSlot * getPixelsPerMinute();
+        console.log(`   Minutes into slot: ${minutesIntoSlot}`);
+        console.log(`   Expected position: ${expectedPosition}px (should be ${(minutesIntoSlot/30*100).toFixed(1)}% through slot)`);
+      }
+    }
+    
+    return isCurrent;
+  };
+
+  // Dynamic positioning based on actual time slot height
+  const MINUTES_PER_SLOT = 30;
+  const ACTUAL_TIME_SLOT_HEIGHT = 60; // Use the actual time slot height from styles
+  const getPixelsPerMinute = () => ACTUAL_TIME_SLOT_HEIGHT / MINUTES_PER_SLOT;
+
+  const getCurrentTimePosition = (slot: any) => {
+    const slotHour = slot.hour;
+    const slotMinute = slot.minute;
+    const slotTimeInMinutes = slotHour * 60 + slotMinute;
+    
+    const currentHour = currentTime.getHours();
+    const currentMinute = currentTime.getMinutes();
+    const currentTimeInMinutes = currentHour * 60 + currentMinute;
+    
+    // Calculate how many minutes into the 30-minute slot the current time is
+    const minutesIntoSlot = currentTimeInMinutes - slotTimeInMinutes;
+    const topPosition = minutesIntoSlot * getPixelsPerMinute();
+    
+    console.log(`📍 Current time position: ${currentHour}:${currentMinute.toString().padStart(2, '0')} in slot ${slotHour}:${slotMinute.toString().padStart(2, '0')}`);
+    console.log(`   Minutes into slot: ${minutesIntoSlot}, Pixels per minute: ${getPixelsPerMinute()}, Top position: ${topPosition}px`);
+    
+    return topPosition;
+  };
+
+  const onTimeSlotLayout = (event: any) => {
+    const { height } = event.nativeEvent.layout;
+    console.log(`📏 Measured time slot height: ${height}px`);
+    if (height !== timeSlotHeight) {
+      setTimeSlotHeight(height);
+    }
   };
 
   const goToPreviousDay = () => {
@@ -154,33 +353,97 @@ export default function Record() {
     setSelectedDate(newDate);
   };
 
-  const goToToday = () => {
-    setSelectedDate(new Date());
+
+  const getStudySessions = async () => {
+    try {
+      // Import the Firebase service function
+      const { getStudySessions: loadAllSessionsFromFirebase } = await import("../firebase/studySessionService.js");
+      const allSessions = await loadAllSessionsFromFirebase();
+      
+      // Filter for current-user in JavaScript (no index needed)
+      const userSessions = allSessions.filter(session => session.userId === "current-user");
+      
+      // Filter sessions by selected date
+      const selectedDateString = selectedDate.toDateString();
+      const sessionsForDate = userSessions.filter(session => {
+        // Convert Firebase timestamp to date string for comparison
+        const sessionDate = session.createdAt?.toDate ? session.createdAt.toDate() : new Date(session.createdAt);
+        return sessionDate.toDateString() === selectedDateString;
+      });
+      
+      // Loading sessions
+      
+      // Process sessions
+      return sessionsForDate;
+    } catch (error) {
+      console.error("Error loading user sessions from Firebase:", error);
+      return [];
+    }
   };
 
-  const getStudySessions = () => {
-    const sessionsByDate = {
-      [new Date().toDateString()]: [
-        { id: 1, subject: "Mathematics", startTime: 9, endTime: 10.5, color: "#FF6B6B" },
-        { id: 2, subject: "Programming", startTime: 14, endTime: 16, color: "#4ECDC4" },
-        { id: 3, subject: "Physics", startTime: 19, endTime: 20.5, color: "#45B7D1" },
-      ],
-      [new Date(Date.now() - 24 * 60 * 60 * 1000).toDateString()]: [
-        { id: 4, subject: "Chemistry", startTime: 10, endTime: 11.5, color: "#96CEB4" },
-        { id: 5, subject: "Biology", startTime: 15, endTime: 17, color: "#FFEAA7" },
-      ],
+  const [studySessions, setStudySessions] = useState([]);
+
+  // Load sessions from Firebase when component mounts or date changes
+  useEffect(() => {
+    const loadSessions = async () => {
+      const sessions = await getStudySessions();
+      setStudySessions(sessions);
     };
-    
-    return sessionsByDate[selectedDate.toDateString()] || [];
-  };
+    loadSessions();
+  }, [selectedDate]); // Reload when selectedDate changes
 
-  const studySessions = getStudySessions();
+  // Function to add test session to Firebase
+  const addTestSession = async () => {
+    try {
+      const { saveStudySession } = await import("../firebase/studySessionService.js");
+      
+      // Create session for TODAY at 5 PM
+      const today = new Date();
+      today.setHours(17, 0, 0, 0); // 5:00 PM today
+      
+      // Create end time (6 PM) - 1 hour later
+      const endTime = new Date(today.getTime() + 3600000); // Add 1 hour (3600000 ms)
+      
+      const sessionData = {
+        subject: "Test Study Session",
+        userId: "current-user",
+        duration: 3600, // 1 hour in seconds
+        notes: "Test session for Friday 5-6 PM",
+        color: "#FF6B6B",
+        isActive: false,
+        createdAt: today,
+        updatedAt: endTime
+      };
+      
+      const sessionId = await saveStudySession(sessionData);
+      // Test session added
+      
+      // Reload sessions to show the new one
+      const sessions = await getStudySessions();
+      setStudySessions(sessions);
+      
+      Alert.alert("Success", "Test session added to Firebase!");
+    } catch (error) {
+      console.error("Error adding test session:", error);
+      Alert.alert("Error", "Failed to add test session");
+    }
+  };
 
   const getSessionForTime = (hour: number, minute: number) => {
     const timeInHours = hour + minute / 60;
-    return studySessions.find(session => 
-      timeInHours >= session.startTime && timeInHours <= session.endTime
-    );
+    
+    return studySessions.find(session => {
+      // Use the actual Firebase timestamps
+      const sessionStart = session.createdAt?.toDate ? session.createdAt.toDate() : new Date(session.createdAt);
+      const sessionEnd = session.updatedAt?.toDate ? session.updatedAt.toDate() : new Date(session.updatedAt);
+      
+      const startHour = sessionStart.getHours() + sessionStart.getMinutes() / 60;
+      const endHour = sessionEnd.getHours() + sessionEnd.getMinutes() / 60;
+      
+      // Session check
+      
+      return timeInHours >= startHour && timeInHours <= endHour;
+    });
   };
 
   const isToday = selectedDate.toDateString() === new Date().toDateString();
@@ -196,11 +459,6 @@ export default function Record() {
         <View style={styles.dateContainer}>
           <Text style={styles.calendarTitle}>Study Calendar</Text>
           <Text style={styles.dateText}>{formatDate(selectedDate)}</Text>
-          {!isToday && (
-            <TouchableOpacity onPress={goToToday} style={styles.todayButton}>
-              <Text style={styles.todayButtonText}>Today</Text>
-            </TouchableOpacity>
-          )}
         </View>
         
         <TouchableOpacity onPress={goToNextDay} style={styles.navButton}>
@@ -213,57 +471,181 @@ export default function Record() {
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}
+          contentContainerStyle={styles.scrollViewContent}
           showsVerticalScrollIndicator={false}
+          contentInsetAdjustmentBehavior="never"
         >
           {/* Time slots */}
           {timeSlots.map((slot, index) => {
-            const hour = slot.getHours();
-            const minute = slot.getMinutes();
+            const hour = slot.hour;
+            const minute = slot.minute;
             const session = getSessionForTime(hour, minute);
             const isCurrent = isCurrentTime(slot) && isToday;
+            
+            // Debug current time detection
+            if (isToday && (hour === 15 || hour === 16)) {
+              console.log(`🕐 Time slot ${hour}:${minute.toString().padStart(2, '0')} - isCurrent: ${isCurrent}`);
+              if (isCurrent) {
+                console.log(`✅ Current time line should appear in slot ${hour}:${minute.toString().padStart(2, '0')}`);
+              }
+            }
+            
             const isHalfHour = minute === 30;
 
-            return (
-              <View key={index} style={styles.timeSlot}>
+  return (
+              <View key={index} style={styles.timeSlot} onLayout={onTimeSlotLayout}>
                 {/* Time label */}
                 <View style={styles.timeLabel}>
-                  <Text style={[styles.timeText, isCurrent && styles.currentTimeText]}>
-                    {formatCalendarTime(slot)}
+                  <Text style={[
+                    styles.timeText,
+                    isCurrent && styles.currentTimeText
+                  ]}>
+                    {formatCalendarTime(slot.displayTime)}
                   </Text>
                 </View>
 
-                {/* Time line */}
+                {/* Time line container */}
                 <View style={styles.timeLineContainer}>
                   <View style={[
                     styles.timeLine,
-                    isHalfHour && styles.halfHourLine,
-                    isCurrent && styles.currentTimeLine
+                    isHalfHour && styles.halfHourLine
                   ]} />
                   
-                  {/* Current time indicator */}
-                  {isCurrent && (
-                    <View style={styles.currentTimeIndicator}>
-                      <View style={styles.currentTimeDot} />
-                      <View style={styles.currentTimeLine} />
-                    </View>
+                  {/* Current time indicator - only show on today */}
+                  {isCurrent && isToday && (
+                    <>
+                      {/* Time line at exact position */}
+                      <View style={[
+                        styles.currentTimeLine,
+                        { 
+                          backgroundColor: "#007AFF",
+                          position: 'absolute',
+                          top: getCurrentTimePosition(slot),
+                          left: 0,
+                          right: 0,
+                          height: 2
+                        }
+                      ]} />
+                      
+                      {/* Circle above the line */}
+                      <View style={[
+                        styles.currentTimeDot,
+                        { 
+                          backgroundColor: "#007AFF",
+                          position: 'absolute',
+                          top: getCurrentTimePosition(slot) - 4, // 4px above the line
+                          left: -4 // Center the circle
+                        }
+                      ]} />
+                      
+                      {/* Time label */}
+                      <Text style={[
+                        styles.currentTimeLabel, 
+                        { 
+                          backgroundColor: "#007AFF",
+                          position: 'absolute',
+                          top: getCurrentTimePosition(slot) - 8,
+                          right: 10
+                        }
+                      ]}>
+                        {currentTime.toLocaleTimeString('en-US', { 
+                          hour: 'numeric', 
+                          minute: '2-digit',
+                          hour12: true 
+                        })}
+                      </Text>
+                    </>
                   )}
 
-                  {/* Study session block */}
-                  {session && minute === 0 && (
-                    <View style={[
-                      styles.sessionBlock,
-                      { 
-                        backgroundColor: session.color,
-                        height: (session.endTime - session.startTime) * 60,
-                        top: 0
-                      }
-                    ]}>
-                      <Text style={styles.sessionText}>{session.subject}</Text>
-                      <Text style={styles.sessionTime}>
-                        {Math.floor(session.startTime)}:00 - {Math.floor(session.endTime)}:30
-                      </Text>
-                    </View>
+
+
+
+
+                  {/* Test purple line at 4:30 PM, 0px down */}
+                  {slot.hour === 16 && slot.minute === 30 && (
+                    <>
+                      {/* Purple line at exact position */}
+                      <View style={[
+                        styles.currentTimeLine,
+                        { 
+                          backgroundColor: "#8B5CF6",
+                          position: 'absolute',
+                          top: 0,
+                          left: 0,
+                          right: 0,
+                          height: 2
+                        }
+                      ]} />
+                      
+                      {/* Purple circle above the line */}
+                      <View style={[
+                        styles.currentTimeDot,
+                        { 
+                          backgroundColor: "#8B5CF6",
+                          position: 'absolute',
+                          top: -4, // 4px above the line
+                          left: -4 // Center the circle
+                        }
+                      ]} />
+                    </>
                   )}
+
+                  {/* Start time line indicators for all sessions */}
+                  {studySessions.map((session, index) => {
+                    const sessionStart = session.createdAt?.toDate ? session.createdAt.toDate() : new Date(session.createdAt);
+                    const sessionHour = sessionStart.getHours();
+                    const sessionMinute = sessionStart.getMinutes();
+                    const sessionTimeInMinutes = sessionHour * 60 + sessionMinute;
+                    
+                    // Check if this session starts in the current time slot
+                    const slotTimeInMinutes = hour * 60 + minute;
+                    const isInCurrentSlot = sessionTimeInMinutes >= slotTimeInMinutes && 
+                      sessionTimeInMinutes < slotTimeInMinutes + 30;
+                    
+                    if (!isInCurrentSlot) return null;
+                    
+                    
+                    // Calculate exact position within the 30-minute slot using same calculation as current time
+                    const minutesWithinSlot = sessionTimeInMinutes - slotTimeInMinutes;
+                    const topPosition = minutesWithinSlot * getPixelsPerMinute();
+                    
+                    // Session positioning (no logging)
+
+  return (
+                      <>
+                        {/* Session line at exact position */}
+                        <View 
+                          key={`session-line-${index}`}
+                          style={[
+                            styles.currentTimeLine,
+                            { 
+                              backgroundColor: "#FF3B30",
+                              position: 'absolute',
+                              top: topPosition,
+                              left: 0,
+                              right: 0,
+                              height: 2
+                            }
+                          ]} 
+                        />
+                        
+                        {/* Session circle above the line */}
+                        <View 
+                          key={`session-dot-${index}`}
+                          style={[
+                            styles.currentTimeDot,
+                            { 
+                              backgroundColor: "#FF3B30",
+                              position: 'absolute',
+                              top: topPosition - 4, // 4px above the line
+                              left: -4 // Center the circle
+                            }
+                          ]} 
+                        />
+                      </>
+                    );
+                  })}
+                  
                 </View>
               </View>
             );
@@ -271,18 +653,26 @@ export default function Record() {
         </ScrollView>
       </View>
 
+      {/* Test Button */}
+      <View style={styles.testButtonContainer}>
+        <TouchableOpacity style={styles.testButton} onPress={addTestSession}>
+          <Text style={styles.testButtonText}>Add Test Session (Today 5-6 PM)</Text>
+        </TouchableOpacity>
+      </View>
+
       {/* Legend */}
       <View style={styles.legend}>
         <Text style={styles.legendTitle}>
           {isToday ? "Today's Sessions" : `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Sessions`}
         </Text>
+        
         {studySessions.length > 0 ? (
           studySessions.map((session) => (
             <View key={session.id} style={styles.legendItem}>
-              <View style={[styles.legendColor, { backgroundColor: session.color }]} />
+              <View style={[styles.legendColor, { backgroundColor: session.color || "#2D5A27" }]} />
               <Text style={styles.legendText}>{session.subject}</Text>
               <Text style={styles.legendTime}>
-                {Math.floor(session.startTime)}:00 - {Math.floor(session.endTime)}:30
+                {formatFirebaseTime(session.createdAt)} - {formatFirebaseTime(session.updatedAt)}
               </Text>
             </View>
           ))
@@ -293,10 +683,17 @@ export default function Record() {
 
       {/* Floating Plus Button */}
       <TouchableOpacity 
-        style={styles.floatingButton}
+        style={[
+          styles.floatingButton,
+          isRecording && styles.recordingButton
+        ]}
         onPress={() => setShowRecordModal(true)}
       >
-        <Ionicons name="add" size={28} color="white" />
+        <Ionicons 
+          name={isRecording ? "stop" : "add"} 
+          size={28} 
+          color="white" 
+        />
       </TouchableOpacity>
 
       {/* Record Modal */}
@@ -316,23 +713,23 @@ export default function Record() {
             </TouchableOpacity>
             <Text style={styles.modalTitle}>New Study Session</Text>
             <View style={styles.placeholder} />
-          </View>
+        </View>
 
           {/* Recording Interface */}
           <ScrollView style={styles.modalContent} showsVerticalScrollIndicator={false}>
             {/* Main Timer Card */}
             <View style={styles.timerCard}>
               <View style={styles.timerDisplay}>
-                <Text style={styles.timerText}>{formatTime(seconds)}</Text>
-                {isRecording && (
+          <Text style={styles.timerText}>{formatTime(seconds)}</Text>
+          {isRecording && (
                   <View style={styles.statusContainer}>
                     <View style={[styles.statusDot, isPaused && styles.pausedDot]} />
-                    <Text style={styles.statusText}>
+            <Text style={styles.statusText}>
                       {isPaused ? "Paused" : "Recording"}
-                    </Text>
+            </Text>
                   </View>
-                )}
-              </View>
+          )}
+        </View>
 
               {/* Subject Input */}
               <View style={styles.subjectSection}>
@@ -345,53 +742,53 @@ export default function Record() {
                   editable={!isRecording}
                   placeholderTextColor="#8E8E93"
                 />
-              </View>
+        </View>
 
-              {/* Control Buttons */}
+        {/* Control Buttons */}
               <View style={styles.controlsContainer}>
-                {!isRecording ? (
-                  <TouchableOpacity
+          {!isRecording ? (
+            <TouchableOpacity
                     style={[styles.primaryButton, !subject.trim() && styles.disabledButton]}
-                    onPress={handleStart}
-                    disabled={!subject.trim()}
-                  >
+              onPress={handleStart}
+              disabled={!subject.trim()}
+            >
                     <Ionicons name="play" size={28} color="white" />
-                  </TouchableOpacity>
-                ) : (
+            </TouchableOpacity>
+          ) : (
                   <View style={styles.recordingControls}>
-                    <TouchableOpacity
+              <TouchableOpacity
                       style={styles.secondaryButton}
-                      onPress={handlePause}
-                    >
+                onPress={handlePause}
+              >
                       <Ionicons name={isPaused ? "play" : "pause"} size={24} color="#2D5A27" />
-                    </TouchableOpacity>
-                    
-                    <TouchableOpacity
+              </TouchableOpacity>
+              
+              <TouchableOpacity
                       style={styles.stopButton}
-                      onPress={handleStop}
-                    >
-                      <Ionicons name="stop" size={24} color="white" />
-                    </TouchableOpacity>
-                  </View>
-                )}
-              </View>
+                onPress={handleStop}
+              >
+                <Ionicons name="stop" size={24} color="white" />
+              </TouchableOpacity>
             </View>
+          )}
+        </View>
+        </View>
 
             {/* Quick Subject Pills */}
             <View style={styles.pillsContainer}>
               {["Math", "Code", "Read", "Science", "History"].map((subj) => (
-                <TouchableOpacity
-                  key={subj}
+              <TouchableOpacity
+                key={subj}
                   style={[styles.pill, subject === subj && styles.selectedPill]}
-                  onPress={() => setSubject(subj)}
-                  disabled={isRecording}
-                >
+                onPress={() => setSubject(subj)}
+                disabled={isRecording}
+              >
                   <Text style={[styles.pillText, subject === subj && styles.selectedPillText]}>
-                    {subj}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+                  {subj}
+                </Text>
+              </TouchableOpacity>
+            ))}
+      </View>
 
             {/* Notes Section */}
             <View style={styles.notesCard}>
@@ -405,8 +802,8 @@ export default function Record() {
                 numberOfLines={3}
                 placeholderTextColor="#8E8E93"
               />
-            </View>
-          </ScrollView>
+      </View>
+    </ScrollView>
         </View>
       </Modal>
     </View>
@@ -449,17 +846,6 @@ const styles = StyleSheet.create({
     color: "#666",
     marginBottom: 8,
   },
-  todayButton: {
-    backgroundColor: "#2D5A27",
-    paddingHorizontal: 12,
-    paddingVertical: 4,
-    borderRadius: 12,
-  },
-  todayButtonText: {
-    color: "white",
-    fontSize: 12,
-    fontWeight: "600",
-  },
   calendarContainer: {
     flex: 1,
     position: "relative",
@@ -467,16 +853,29 @@ const styles = StyleSheet.create({
   scrollView: {
     flex: 1,
   },
+  scrollViewContent: {
+    paddingTop: 0,
+    marginTop: 0,
+  },
   timeSlot: {
     flexDirection: "row",
-    height: 60,
+    height: 60, // Fixed height for time slots
     paddingHorizontal: 20,
+    position: 'relative', // Allow absolute positioning within time slots
+    marginTop: 0,
+    marginBottom: 0,
+    paddingTop: 0,
+    paddingBottom: 0,
+    justifyContent: "flex-start",
+    alignItems: "flex-start",
   },
   timeLabel: {
     width: 80,
-    justifyContent: "center",
+    justifyContent: "flex-start",
     alignItems: "flex-end",
     paddingRight: 10,
+    paddingTop: 0,
+    transform: [{ translateY: -8 }], // Move time text up to overlap with border
   },
   timeText: {
     fontSize: 14,
@@ -490,26 +889,40 @@ const styles = StyleSheet.create({
   timeLineContainer: {
     flex: 1,
     position: "relative",
-    justifyContent: "center",
+    justifyContent: "flex-start",
+    paddingTop: 0, // Position line at the very top to overlap with border
   },
   timeLine: {
-    height: 1,
+    height: 2,
     backgroundColor: "#E5E5EA",
     width: "100%",
   },
   halfHourLine: {
     backgroundColor: "#D1D5DB",
+    height: 1,
   },
   currentTimeLine: {
-    backgroundColor: "#2D5A27",
-    height: 2,
+    backgroundColor: "#E5E5EA",
+    height: 3,
   },
   currentTimeIndicator: {
     position: "absolute",
     left: 0,
     right: 0,
     height: 2,
-    backgroundColor: "#2D5A27",
+    backgroundColor: "transparent",
+  },
+  currentTimeLabel: {
+    position: "absolute",
+    right: 10,
+    top: -8,
+    backgroundColor: "#007AFF",
+    color: "white",
+    fontSize: 12,
+    fontWeight: "bold",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
     flexDirection: "row",
     alignItems: "center",
   },
@@ -518,7 +931,6 @@ const styles = StyleSheet.create({
     height: 8,
     borderRadius: 4,
     backgroundColor: "#2D5A27",
-    marginLeft: -4,
   },
   sessionBlock: {
     position: "absolute",
@@ -595,6 +1007,11 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.3,
     shadowRadius: 8,
     elevation: 8,
+  },
+  recordingButton: {
+    backgroundColor: "#FF3B30", // Red color when recording
+    shadowColor: "#FF3B30",
+    transform: [{ scale: 1.1 }], // Slightly larger when recording
   },
   // Modal styles
   modalContainer: {
@@ -846,5 +1263,38 @@ const styles = StyleSheet.create({
   recentDuration: {
     fontSize: 15,
     color: "#8E8E93",
+  },
+  testButtonContainer: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    backgroundColor: "#ffffff",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E5EA",
+  },
+  testButton: {
+    backgroundColor: "#2D5A27",
+    paddingVertical: 12,
+    paddingHorizontal: 20,
+    borderRadius: 8,
+    alignItems: "center",
+  },
+  testButtonText: {
+    color: "#ffffff",
+    fontSize: 16,
+    fontWeight: "600",
+  },
+  debugScrollView: {
+    maxHeight: 200, // Limit height to 200px
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+    padding: 8,
+  },
+  startTimeLine: {
+    position: "absolute",
+    left: 0,
+    right: 0,
+    height: 2,
+    backgroundColor: "#FF3B30", // Red line
+    zIndex: 10,
   },
 });
