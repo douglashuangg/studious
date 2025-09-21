@@ -374,6 +374,23 @@ export default function Record() {
       // Loading sessions
       
       // Process sessions
+      console.log("=== FIREBASE DATA DEBUG ===");
+      console.log("All sessions from Firebase:", allSessions);
+      console.log("User sessions (current-user):", userSessions);
+      console.log("Sessions for date:", sessionsForDate);
+      console.log("Number of sessions found:", sessionsForDate.length);
+      
+      if (sessionsForDate.length > 0) {
+        console.log("=== FIRST SESSION FULL OBJECT ===");
+        console.log("Complete session object:", JSON.stringify(sessionsForDate[0], null, 2));
+        console.log("Session keys:", Object.keys(sessionsForDate[0]));
+        console.log("Session startTime type:", typeof sessionsForDate[0].startTime);
+        console.log("Session endTime type:", typeof sessionsForDate[0].endTime);
+        console.log("Session createdAt type:", typeof sessionsForDate[0].createdAt);
+        console.log("Session updatedAt type:", typeof sessionsForDate[0].updatedAt);
+      }
+      
+      console.log("=== END FIREBASE DEBUG ===");
       return sessionsForDate;
     } catch (error) {
       console.error("Error loading user sessions from Firebase:", error);
@@ -564,6 +581,85 @@ export default function Record() {
 
 
 
+                  {/* Study session blocks - render based on start and end times */}
+                  {studySessions.map((session) => {
+                    // Get the formatted times to extract hours and minutes
+                    const startTimeFormatted = session.startTime ? formatFirebaseTime(session.startTime) : formatFirebaseTime(session.createdAt);
+                    const endTimeFormatted = session.endTime ? formatFirebaseTime(session.endTime) : formatFirebaseTime(session.updatedAt);
+                    
+                    // Extract start time
+                    const startHour = parseInt(startTimeFormatted.split(':')[0]);
+                    const startMinute = parseInt(startTimeFormatted.split(':')[1].split(' ')[0]);
+                    const startIsAM = startTimeFormatted.includes('AM');
+                    const adjustedStartHour = startIsAM ? (startHour === 12 ? 0 : startHour) : (startHour === 12 ? 12 : startHour + 12);
+                    
+                    // Extract end time
+                    const endHour = parseInt(endTimeFormatted.split(':')[0]);
+                    const endMinute = parseInt(endTimeFormatted.split(':')[1].split(' ')[0]);
+                    const endIsAM = endTimeFormatted.includes('AM');
+                    const adjustedEndHour = endIsAM ? (endHour === 12 ? 0 : endHour) : (endHour === 12 ? 12 : endHour + 12);
+                    
+                    console.log(`Session: ${session.subject}`);
+                    console.log(`Start: ${startTimeFormatted} (${adjustedStartHour}:${startMinute})`);
+                    console.log(`End: ${endTimeFormatted} (${adjustedEndHour}:${endMinute})`);
+                    console.log(`Current slot: ${hour}:${minute}`);
+                    
+                    // Check if this session overlaps with this time slot
+                    const sessionStartsInThisSlot = adjustedStartHour === hour && 
+                      (startMinute >= minute && startMinute < minute + 30);
+                    const sessionEndsInThisSlot = adjustedEndHour === hour && 
+                      (endMinute >= minute && endMinute < minute + 30);
+                    const sessionSpansThisSlot = adjustedStartHour < hour && adjustedEndHour > hour;
+                    const sessionContinuesFromPrevious = adjustedStartHour < hour && adjustedEndHour === hour && endMinute > minute;
+                    const sessionContinuesToNext = adjustedStartHour === hour && startMinute < minute + 30 && adjustedEndHour > hour;
+                    
+                    const sessionOverlapsSlot = sessionStartsInThisSlot || sessionEndsInThisSlot || sessionSpansThisSlot || 
+                      sessionContinuesFromPrevious || sessionContinuesToNext;
+                    
+                    if (!sessionOverlapsSlot) {
+                      return null;
+                    }
+                    
+                    // Calculate position and height within the slot
+                    let topPosition = 0;
+                    let height = 0;
+                    
+                    if (sessionStartsInThisSlot) {
+                      // Session starts in this slot
+                      topPosition = (startMinute - minute) * getPixelsPerMinute();
+                      if (sessionEndsInThisSlot) {
+                        // Session ends in this slot too
+                        height = (endMinute - startMinute) * getPixelsPerMinute();
+                      } else {
+                        // Session continues to next slot(s)
+                        height = (30 - (startMinute - minute)) * getPixelsPerMinute();
+                      }
+                    } else if (sessionEndsInThisSlot) {
+                      // Session ends in this slot
+                      topPosition = 0;
+                      height = (endMinute - minute) * getPixelsPerMinute();
+                    } else if (sessionSpansThisSlot || sessionContinuesFromPrevious || sessionContinuesToNext) {
+                      // Session spans the entire slot
+                      topPosition = 0;
+                      height = 30 * getPixelsPerMinute();
+                    }
+                    
+                    return (
+                      <View
+                        key={session.id}
+                        style={{
+                          position: 'absolute',
+                          left: 0,
+                          right: 0,
+                          top: topPosition,
+                          height: Math.max(height, 4), // Minimum 4px height
+                          backgroundColor: '#34C759', // Green block
+                          zIndex: 10,
+                        }}
+                      />
+                    );
+                  })}
+
                   {/* Test session block 4:31-4:33 PM */}
                   {slot.hour === 16 && slot.minute === 30 && (
                     <View style={[
@@ -661,13 +757,15 @@ export default function Record() {
         </View>
         
         {studySessions.length > 0 ? (
-          studySessions.map((session) => (
-            <View key={session.id} style={styles.legendItem}>
+          studySessions.map((session, index) => (
+            <View key={session.id || index} style={styles.legendItem}>
               <View style={[styles.legendColor, { backgroundColor: session.color || "#2D5A27" }]} />
-              <Text style={styles.legendText}>{session.subject}</Text>
-              <Text style={styles.legendTime}>
-                {formatFirebaseTime(session.createdAt)} - {formatFirebaseTime(session.updatedAt)}
-              </Text>
+              <View style={styles.legendContent}>
+                <Text style={styles.legendText}>{session.subject}</Text>
+                <Text style={styles.legendTime}>
+                  {session.startTime ? formatFirebaseTime(session.startTime) : formatFirebaseTime(session.createdAt)} - {session.endTime ? formatFirebaseTime(session.endTime) : formatFirebaseTime(session.updatedAt)}
+                </Text>
+              </View>
             </View>
           ))
         ) : (
@@ -963,8 +1061,21 @@ const styles = StyleSheet.create({
   },
   legendItem: {
     flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 10,
+    alignItems: "flex-start",
+    marginBottom: 12,
+    padding: 12,
+    backgroundColor: "#f8f9fa",
+    borderRadius: 8,
+  },
+  legendContent: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  debugText: {
+    fontSize: 10,
+    color: "#666",
+    marginBottom: 2,
+    fontFamily: "monospace",
   },
   legendColor: {
     width: 16,

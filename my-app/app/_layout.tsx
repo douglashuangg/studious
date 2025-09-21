@@ -1,5 +1,6 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import * as Haptics from "expo-haptics";
 
 export default function RootLayout() {
   return (
@@ -14,6 +15,11 @@ export default function RootLayout() {
           height: 80,
           paddingBottom: 20,
           paddingTop: 10,
+        },
+      }}
+      screenListeners={{
+        tabPress: () => {
+          Haptics.impactAsync(Haptics.ImpactFeedbackStyle.Light);
         },
       }}
     >
@@ -76,6 +82,12 @@ export default function RootLayout() {
       />
       <Tabs.Screen
         name="user-profile/[id]"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="statistics"
         options={{
           href: null, // Hide from tab bar
         }}
