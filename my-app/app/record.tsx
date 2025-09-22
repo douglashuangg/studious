@@ -1,7 +1,16 @@
-import { Text, View, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert, Modal, Dimensions } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert, Modal, Dimensions, AppState } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect, useRef } from "react";
 import { saveStudySession } from "../firebase/studySessionService.js";
+import { 
+  startBackgroundTimer, 
+  stopBackgroundTimer, 
+  saveTimerState, 
+  loadTimerState, 
+  clearTimerState,
+  restoreTimerState,
+  calculateElapsedTime
+} from "../backgroundTimerService.js";
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -148,7 +157,7 @@ export default function Record() {
     return topPosition;
   };
 
-  const handleStart = () => {
+  const handleStart = async () => {
     if (!subject.trim()) {
       Alert.alert("Subject Required", "Please enter a subject for your study session.");
       return;
@@ -156,14 +165,42 @@ export default function Record() {
     
     if (!isRecording) {
       setSeconds(0);
-      setSessionStartTime(new Date()); // Record the start time
+      const startTime = new Date();
+      setSessionStartTime(startTime); // Record the start time
+      
+      // Start background timer (may not be available on all devices)
+      const backgroundTimerStarted = await startBackgroundTimer();
+      
+      // Save timer state
+      await saveTimerState({
+        isRecording: true,
+        isPaused: false,
+        startTime: startTime.getTime(),
+        subject,
+        notes,
+        elapsedTime: 0,
+        backgroundTimerEnabled: backgroundTimerStarted
+      });
     }
     setIsRecording(true);
     setIsPaused(false);
   };
 
-  const handlePause = () => {
-    setIsPaused(!isPaused);
+  const handlePause = async () => {
+    const newPausedState = !isPaused;
+    setIsPaused(newPausedState);
+    
+    // Save paused state
+    if (sessionStartTime) {
+      await saveTimerState({
+        isRecording,
+        isPaused: newPausedState,
+        startTime: sessionStartTime.getTime(),
+        subject,
+        notes,
+        elapsedTime: seconds
+      });
+    }
   };
 
   const handleStop = () => {
@@ -221,13 +258,17 @@ export default function Record() {
     );
   };
 
-  const resetSession = () => {
+  const resetSession = async () => {
     setIsRecording(false);
     setIsPaused(false);
     setSeconds(0);
     setSubject("");
     setNotes("");
     setSessionStartTime(null);
+    
+    // Stop background timer and clear state
+    await stopBackgroundTimer();
+    await clearTimerState();
   };
 
   // Calendar helper functions
@@ -408,6 +449,63 @@ export default function Record() {
     };
     loadSessions();
   }, [selectedDate]); // Reload when selectedDate changes
+
+  // Background timer functionality
+  useEffect(() => {
+    const loadTimerFromStorage = async () => {
+      const restoredState = await restoreTimerState();
+      if (restoredState && restoredState.isRecording) {
+        // Restore timer state
+        setIsRecording(true);
+        setIsPaused(restoredState.isPaused || false);
+        setSubject(restoredState.subject || "");
+        setNotes(restoredState.notes || "");
+        setSessionStartTime(new Date(restoredState.startTime));
+        
+        // Use the calculated elapsed time
+        setSeconds(restoredState.elapsedTime || 0);
+        
+        console.log("Timer state restored from background:", {
+          isRecording: true,
+          elapsed: restoredState.elapsedTime,
+          subject: restoredState.subject
+        });
+      }
+    };
+
+    loadTimerFromStorage();
+  }, []);
+
+  // Handle app state changes (foreground/background)
+  useEffect(() => {
+    const handleAppStateChange = (nextAppState) => {
+      if (nextAppState === 'background' && isRecording) {
+        // Save timer state when going to background
+        saveTimerState({
+          isRecording,
+          isPaused,
+          startTime: sessionStartTime?.getTime(),
+          subject,
+          notes,
+          elapsedTime: seconds
+        });
+        console.log("Timer state saved for background");
+      } else if (nextAppState === 'active' && isRecording) {
+        // Restore timer when coming back to foreground
+        const restoreTimer = async () => {
+          const restoredState = await restoreTimerState();
+          if (restoredState && restoredState.isRecording) {
+            setSeconds(restoredState.elapsedTime);
+            console.log("Timer restored from background:", restoredState.elapsedTime, "seconds");
+          }
+        };
+        restoreTimer();
+      }
+    };
+
+    const subscription = AppState.addEventListener('change', handleAppStateChange);
+    return () => subscription?.remove();
+  }, [isRecording, isPaused, sessionStartTime, subject, notes, seconds]);
 
   // Function to add test session to Firebase
   const addTestSession = async () => {
@@ -805,6 +903,16 @@ export default function Record() {
             <Text style={styles.statusText}>
                       {isPaused ? "Paused" : "Recording"}
             </Text>
+                    {!isPaused && (
+                      <Text style={styles.backgroundIndicator}>
+                        📱 Timer running
+                      </Text>
+                    )}
+                    {!isPaused && (
+                      <Text style={styles.backgroundNote}>
+                        🔋 Works when screen is off
+                      </Text>
+                    )}
                   </View>
           )}
         </View>
@@ -1070,6 +1178,9 @@ const styles = StyleSheet.create({
   legendContent: {
     flex: 1,
     marginLeft: 12,
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
   },
   debugText: {
     fontSize: 10,
@@ -1088,6 +1199,7 @@ const styles = StyleSheet.create({
     color: "#000",
     fontWeight: "500",
     flex: 1,
+    marginRight: 8,
   },
   legendTime: {
     fontSize: 14,
@@ -1194,6 +1306,20 @@ const styles = StyleSheet.create({
     fontSize: 15,
     color: "#8E8E93",
     fontWeight: "500",
+  },
+  backgroundIndicator: {
+    fontSize: 12,
+    color: "#34C759",
+    fontWeight: "500",
+    marginTop: 4,
+    textAlign: "center",
+  },
+  backgroundNote: {
+    fontSize: 11,
+    color: "#FF9500",
+    fontWeight: "500",
+    marginTop: 2,
+    textAlign: "center",
   },
   subjectSection: {
     marginBottom: 32,

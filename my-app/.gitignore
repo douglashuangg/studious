@@ -44,3 +44,4 @@ app-example
 
 # Firebase config (contains sensitive API keys)
 firebase/firebaseInit.js
+google-services.json

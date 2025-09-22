@@ -238,8 +238,8 @@ export default function Calendar() {
 
                   {/* Study session block */}
                   {session && minute === 0 && (() => {
-                    const startTime = new Date(session.startTime);
-                    const endTime = new Date(session.endTime);
+                    const startTime = session.createdAt?.toDate ? session.createdAt.toDate() : new Date(session.createdAt);
+                    const endTime = session.updatedAt?.toDate ? session.updatedAt.toDate() : new Date(session.updatedAt);
                     const startHour = startTime.getHours();
                     const startMinute = startTime.getMinutes();
                     const endHour = endTime.getHours();
@@ -302,8 +302,9 @@ export default function Calendar() {
         </Text>
         {sessionsForDate.length > 0 ? (
           sessionsForDate.map((session) => {
-            const startTime = new Date(session.startTime);
-            const endTime = new Date(session.endTime);
+            // Use the correct Firebase timestamp properties
+            const startTime = session.createdAt?.toDate ? session.createdAt.toDate() : new Date(session.createdAt);
+            const endTime = session.updatedAt?.toDate ? session.updatedAt.toDate() : new Date(session.updatedAt);
             const startTimeStr = startTime.toLocaleTimeString('en-US', { 
               hour: 'numeric', 
               minute: '2-digit',
@@ -317,8 +318,8 @@ export default function Calendar() {
             
             return (
               <View key={session.id} style={styles.legendItem}>
-                <View style={[styles.legendColor, { backgroundColor: session.color }]} />
-                <Text style={styles.legendText}>{session.subject}</Text>
+                <View style={[styles.legendColor, { backgroundColor: session.color || "#2D5A27" }]} />
+                <Text style={styles.legendText}>{session.subject || "Study Session"}</Text>
                 <Text style={styles.legendTime}>
                   {startTimeStr} - {endTimeStr}
                 </Text>
@@ -501,6 +502,7 @@ const styles = StyleSheet.create({
     color: "#000",
     fontWeight: "500",
     flex: 1,
+    marginRight: 8,
   },
   legendTime: {
     fontSize: 14,
