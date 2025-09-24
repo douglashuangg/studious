@@ -3,15 +3,16 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect, useRef } from "react";
 import { saveStudySession } from "../firebase/studySessionService.js";
-import { 
-  startBackgroundTimer, 
-  stopBackgroundTimer, 
-  saveTimerState, 
-  loadTimerState, 
-  clearTimerState,
-  restoreTimerState,
-  calculateElapsedTime
-} from "../backgroundTimerService.js";
+// TIMER IMPORTS COMMENTED OUT
+// import { 
+//   startBackgroundTimer, 
+//   stopBackgroundTimer, 
+//   saveTimerState, 
+//   loadTimerState, 
+//   clearTimerState,
+//   restoreTimerState,
+//   calculateElapsedTime
+// } from "../backgroundTimerService.js";
 
 const { height: screenHeight } = Dimensions.get('window');
 
@@ -31,17 +32,18 @@ export default function Calendar() {
   const [showRecordModal, setShowRecordModal] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
 
-  useEffect(() => {
-    let interval: ReturnType<typeof setInterval>;
+  // TIMER FUNCTIONALITY COMMENTED OUT
+  // useEffect(() => {
+  //   let interval: ReturnType<typeof setInterval>;
     
-    if (isRecording && !isPaused) {
-      interval = setInterval(() => {
-        setSeconds(seconds => seconds + 1);
-      }, 1000);
-    }
+  //   if (isRecording && !isPaused) {
+  //     interval = setInterval(() => {
+  //       setSeconds(seconds => seconds + 1);
+  //     }, 1000);
+  //   }
     
-    return () => clearInterval(interval);
-  }, [isRecording, isPaused]);
+  //   return () => clearInterval(interval);
+  // }, [isRecording, isPaused]);
 
   // Calendar time update
   useEffect(() => {
@@ -169,19 +171,20 @@ export default function Calendar() {
       const startTime = new Date();
       setSessionStartTime(startTime); // Record the start time
       
+      // TIMER FUNCTIONALITY COMMENTED OUT
       // Start background timer (may not be available on all devices)
-      const backgroundTimerStarted = await startBackgroundTimer();
+      // const backgroundTimerStarted = await startBackgroundTimer();
       
       // Save timer state
-      await saveTimerState({
-        isRecording: true,
-        isPaused: false,
-        startTime: startTime.getTime(),
-        subject,
-        notes,
-        elapsedTime: 0,
-        backgroundTimerEnabled: backgroundTimerStarted
-      });
+      // await saveTimerState({
+      //   isRecording: true,
+      //   isPaused: false,
+      //   startTime: startTime.getTime(),
+      //   subject,
+      //   notes,
+      //   elapsedTime: 0,
+      //   backgroundTimerEnabled: backgroundTimerStarted
+      // });
     }
     setIsRecording(true);
     setIsPaused(false);
@@ -191,17 +194,18 @@ export default function Calendar() {
     const newPausedState = !isPaused;
     setIsPaused(newPausedState);
     
+    // TIMER FUNCTIONALITY COMMENTED OUT
     // Save paused state
-    if (sessionStartTime) {
-      await saveTimerState({
-        isRecording,
-        isPaused: newPausedState,
-        startTime: sessionStartTime.getTime(),
-        subject,
-        notes,
-        elapsedTime: seconds
-      });
-    }
+    // if (sessionStartTime) {
+    //   await saveTimerState({
+    //     isRecording,
+    //     isPaused: newPausedState,
+    //     startTime: sessionStartTime.getTime(),
+    //     subject,
+    //     notes,
+    //     elapsedTime: seconds
+    //   });
+    // }
   };
 
   const handleStop = () => {
@@ -267,9 +271,10 @@ export default function Calendar() {
     setNotes("");
     setSessionStartTime(null);
     
+    // TIMER FUNCTIONALITY COMMENTED OUT
     // Stop background timer and clear state
-    await stopBackgroundTimer();
-    await clearTimerState();
+    // await stopBackgroundTimer();
+    // await clearTimerState();
   };
 
   // Calendar helper functions
@@ -461,62 +466,62 @@ export default function Calendar() {
     }, [])
   );
 
-  // Background timer functionality
-  useEffect(() => {
-    const loadTimerFromStorage = async () => {
-      const restoredState = await restoreTimerState();
-      if (restoredState && restoredState.isRecording) {
-        // Restore timer state
-        setIsRecording(true);
-        setIsPaused(restoredState.isPaused || false);
-        setSubject(restoredState.subject || "");
-        setNotes(restoredState.notes || "");
-        setSessionStartTime(new Date(restoredState.startTime));
+  // BACKGROUND TIMER FUNCTIONALITY COMMENTED OUT
+  // useEffect(() => {
+  //   const loadTimerFromStorage = async () => {
+  //     const restoredState = await restoreTimerState();
+  //     if (restoredState && restoredState.isRecording) {
+  //       // Restore timer state
+  //       setIsRecording(true);
+  //       setIsPaused(restoredState.isPaused || false);
+  //       setSubject(restoredState.subject || "");
+  //       setNotes(restoredState.notes || "");
+  //       setSessionStartTime(new Date(restoredState.startTime));
         
-        // Use the calculated elapsed time
-        setSeconds(restoredState.elapsedTime || 0);
+  //       // Use the calculated elapsed time
+  //       setSeconds(restoredState.elapsedTime || 0);
         
-        console.log("Timer state restored from background:", {
-          isRecording: true,
-          elapsed: restoredState.elapsedTime,
-          subject: restoredState.subject
-        });
-      }
-    };
+  //       console.log("Timer state restored from background:", {
+  //         isRecording: true,
+  //         elapsed: restoredState.elapsedTime,
+  //         subject: restoredState.subject
+  //       });
+  //     }
+  //   };
 
-    loadTimerFromStorage();
-  }, []);
+  //   loadTimerFromStorage();
+  // }, []);
 
-  // Handle app state changes (foreground/background)
-  useEffect(() => {
-    const handleAppStateChange = (nextAppState: string) => {
-      if (nextAppState === 'background' && isRecording) {
-        // Save timer state when going to background
-        saveTimerState({
-          isRecording,
-          isPaused,
-          startTime: sessionStartTime?.getTime(),
-          subject,
-          notes,
-          elapsedTime: seconds
-        });
-        console.log("Timer state saved for background");
-      } else if (nextAppState === 'active' && isRecording) {
-        // Restore timer when coming back to foreground
-        const restoreTimer = async () => {
-          const restoredState = await restoreTimerState();
-          if (restoredState && restoredState.isRecording) {
-            setSeconds(restoredState.elapsedTime);
-            console.log("Timer restored from background:", restoredState.elapsedTime, "seconds");
-          }
-        };
-        restoreTimer();
-      }
-    };
+  // APP STATE CHANGE HANDLER COMMENTED OUT (TIMER FUNCTIONALITY)
+  // useEffect(() => {
+  //   const handleAppStateChange = (nextAppState: string) => {
+  //     if (nextAppState === 'background' && isRecording) {
+  //       // Save timer state when going to background
+  //       saveTimerState({
+  //         isRecording,
+  //         isPaused,
+  //         startTime: sessionStartTime?.getTime(),
+  //         subject,
+  //         notes,
+  //         elapsedTime: seconds
+  //       });
+  //       console.log("Timer state saved for background");
+  //     } else if (nextAppState === 'active' && isRecording) {
+  //       // Restore timer when coming back to foreground
+  //       const restoreTimer = async () => {
+  //         const restoredState = await restoreTimerState();
+  //         if (restoredState && restoredState.isRecording) {
+  //           setSeconds(restoredState.elapsedTime);
+  //           console.log("Timer restored from background:", restoredState.elapsedTime, "seconds");
+  //         }
+  //       };
+  //       restoreTimer();
+  //     }
+  //   };
 
-    const subscription = AppState.addEventListener('change', handleAppStateChange);
-    return () => subscription?.remove();
-  }, [isRecording, isPaused, sessionStartTime, subject, notes, seconds]);
+  //   const subscription = AppState.addEventListener('change', handleAppStateChange);
+  //   return () => subscription?.remove();
+  // }, [isRecording, isPaused, sessionStartTime, subject, notes, seconds]);
 
   // Function to add test session to Firebase
   const addTestSession = async () => {
@@ -820,15 +825,17 @@ export default function Calendar() {
         </ScrollView>
       </View>
 
-      {/* Test Button */}
-      <View style={styles.testButtonContainer}>
-        <TouchableOpacity style={styles.testButton} onPress={addTestSession}>
-          <Text style={styles.testButtonText}>Add Test Session (Current Time + 1hr)</Text>
-        </TouchableOpacity>
-      </View>
+      {/* Fixed Today's Sessions Section */}
+      <View style={styles.fixedSessionsContainer}>
+        {/* Test Button */}
+        <View style={styles.testButtonContainer}>
+          <TouchableOpacity style={styles.testButton} onPress={addTestSession}>
+            <Text style={styles.testButtonText}>Add Test Session (Current Time + 1hr)</Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Legend */}
-      <View style={styles.legend}>
+        {/* Legend */}
+        <View style={styles.legend}>
         <View style={styles.legendHeader}>
           <Text style={styles.legendTitle}>
             {isToday ? "Today's Sessions" : `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Sessions`}
@@ -848,23 +855,29 @@ export default function Calendar() {
           </TouchableOpacity>
         </View>
         
-        {studySessions.length > 0 ? (
-          studySessions.map((session, index) => (
-            <View key={session.id || index} style={styles.legendItem}>
-              <View style={[styles.legendColor, { backgroundColor: session.color || "#2D5A27" }]} />
-              <View style={styles.legendContent}>
-                <Text style={styles.legendText}>{session.subject}</Text>
-                <Text style={styles.legendTime}>
-                  {session.startTime ? formatFirebaseTime(session.startTime) : formatFirebaseTime(session.createdAt)} - {session.endTime ? formatFirebaseTime(session.endTime) : formatFirebaseTime(session.updatedAt)}
-                </Text>
+        <ScrollView 
+          style={styles.sessionsScrollView}
+          showsVerticalScrollIndicator={true}
+          nestedScrollEnabled={true}
+        >
+          {studySessions.length > 0 ? (
+            studySessions.map((session, index) => (
+              <View key={session.id || index} style={styles.legendItem}>
+                <View style={[styles.legendColor, { backgroundColor: session.color || "#2D5A27" }]} />
+                <View style={styles.legendContent}>
+                  <Text style={styles.legendText}>{session.subject}</Text>
+                  <Text style={styles.legendTime}>
+                    {session.startTime ? formatFirebaseTime(session.startTime) : formatFirebaseTime(session.createdAt)} - {session.endTime ? formatFirebaseTime(session.endTime) : formatFirebaseTime(session.updatedAt)}
+                  </Text>
+                </View>
               </View>
-            </View>
-          ))
-        ) : (
-          <Text style={styles.noSessionsText}>No study sessions for this day</Text>
-        )}
+            ))
+          ) : (
+            <Text style={styles.noSessionsText}>No study sessions for this day</Text>
+          )}
+        </ScrollView>
       </View>
-
+      </View>
 
       {/* Record Modal */}
       <Modal
@@ -994,6 +1007,7 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
+    paddingBottom: 200, // Add padding for fixed sessions section
   },
   // Calendar styles
   calendarHeader: {
@@ -1508,5 +1522,19 @@ const styles = StyleSheet.create({
     height: 2,
     backgroundColor: "#FF3B30", // Red line
     zIndex: 10,
+  },
+  fixedSessionsContainer: {
+    position: "absolute",
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: "#FFFFFF",
+    borderTopWidth: 1,
+    borderTopColor: "#E5E5EA",
+    maxHeight: 200, // Fixed height for the sessions section
+  },
+  sessionsScrollView: {
+    maxHeight: 150, // Scrollable area within the fixed container
+    paddingHorizontal: 20,
   },
 });

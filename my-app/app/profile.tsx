@@ -4,38 +4,80 @@ import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
 import { getStudySessions } from "../firebase/studySessionService";
 import { useAuth } from "../contexts/AuthContext";
+import { doc, getDoc } from "firebase/firestore";
+import { db } from "../firebase/firebaseInit";
+import { useFocusEffect } from '@react-navigation/native';
+import React from 'react';
 
 export default function Profile() {
   const router = useRouter();
   const { user, logout } = useAuth();
-  const [studySessions, setStudySessions] = useState([]);
+  const [studySessions, setStudySessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [totalStudyHours, setTotalStudyHours] = useState(0);
   const [totalSessions, setTotalSessions] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
+  const [userProfile, setUserProfile] = useState<any>(null);
 
   useEffect(() => {
-    const fetchStudySessions = async () => {
+    const fetchData = async () => {
       try {
+        setLoading(true);
+        
+        // Fetch study sessions
         const sessions = await getStudySessions();
         setStudySessions(sessions);
         calculateStats(sessions);
+        
+        // Fetch user profile data
+        if (user) {
+          const userDoc = await getDoc(doc(db, 'users', user.uid));
+          if (userDoc.exists()) {
+            const profileData = userDoc.data();
+            console.log('📱 Loaded user profile data:', profileData);
+            setUserProfile(profileData);
+          } else {
+            console.log('📱 No user profile document found, user needs to create profile');
+          }
+        }
+        
         setLoading(false);
       } catch (error) {
-        console.error("Error fetching study sessions:", error);
+        console.error("Error fetching data:", error);
         setLoading(false);
       }
     };
 
-    fetchStudySessions();
-  }, []);
+    fetchData();
+  }, [user]);
 
-  const calculateStats = (sessions) => {
+  // Reload profile data when tab comes into focus (e.g., returning from edit profile)
+  useFocusEffect(
+    React.useCallback(() => {
+      const reloadProfileData = async () => {
+        if (user) {
+          try {
+            const userDoc = await getDoc(doc(db, 'users', user.uid));
+            if (userDoc.exists()) {
+              const profileData = userDoc.data();
+              console.log('🔄 Reloaded user profile data:', profileData);
+              setUserProfile(profileData);
+            }
+          } catch (error) {
+            console.error('Error reloading profile data:', error);
+          }
+        }
+      };
+      reloadProfileData();
+    }, [user])
+  );
+
+  const calculateStats = (sessions: any[]) => {
     let totalHours = 0;
     let sessionCount = sessions.length;
     
     // Calculate total study hours
-    sessions.forEach(session => {
+    sessions.forEach((session: any) => {
       if (session.startTime && session.endTime) {
         const start = session.startTime?.toDate ? session.startTime.toDate() : new Date(session.startTime);
         const end = session.endTime?.toDate ? session.endTime.toDate() : new Date(session.endTime);
@@ -57,13 +99,13 @@ export default function Profile() {
     setStreakDays(uniqueDays.size);
   };
 
-  const formatTime = (hours) => {
+  const formatTime = (hours: number) => {
     const wholeHours = Math.floor(hours);
     const minutes = Math.round((hours - wholeHours) * 60);
     return `${wholeHours}h ${minutes}m`;
   };
 
-  const getTimeAgo = (date) => {
+  const getTimeAgo = (date: Date) => {
     const now = new Date();
     const diffMs = now.getTime() - date.getTime();
     const diffDays = Math.floor(diffMs / (1000 * 60 * 60 * 24));
@@ -128,9 +170,22 @@ export default function Profile() {
           </View>
         </View>
         
-        <Text style={styles.name}>Douglas Huang</Text>
-        <Text style={styles.username}>@douglashuang</Text>
-        <Text style={styles.bio}>Computer Science Student | Study Enthusiast</Text>
+        <Text style={styles.name}>
+          {userProfile?.displayName || user?.displayName || 'User'}
+        </Text>
+        <Text style={styles.username}>
+          @{userProfile?.username || user?.email?.split('@')[0] || 'user'}
+        </Text>
+        <Text style={styles.bio}>
+          {userProfile?.bio || 'No bio available'}
+        </Text>
+        {/* Debug info - remove in production */}
+        {__DEV__ && (
+          <Text style={{fontSize: 10, color: '#999', marginTop: 5}}>
+            Debug: userProfile={JSON.stringify(userProfile?.displayName)}, 
+            user={JSON.stringify(user?.displayName)}
+          </Text>
+        )}
       </View>
 
       {/* Stats Row */}
@@ -159,7 +214,10 @@ export default function Profile() {
 
       {/* Action Buttons */}
       <View style={styles.actionsContainer}>
-        <TouchableOpacity style={styles.editProfileButton}>
+        <TouchableOpacity 
+          style={styles.editProfileButton}
+          onPress={() => router.push("/edit-profile")}
+        >
           <Text style={styles.editProfileText}>Edit Profile</Text>
         </TouchableOpacity>
         <TouchableOpacity style={styles.settingsButton} onPress={handleLogout}>

@@ -76,6 +76,12 @@ export default function RootLayout() {
         }}
       />
       <Tabs.Screen
+        name="edit-profile"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
+      <Tabs.Screen
         name="search"
         options={{
           href: null, // Hide from tab bar
