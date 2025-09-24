@@ -39,7 +39,16 @@ export default function RootLayout() {
       <Tabs.Screen
         name="record"
         options={{
-          title: "Study",
+          title: "Timer",
+          tabBarIcon: ({ color, size }) => (
+            <Ionicons name="stopwatch" size={size} color={color} />
+          ),
+        }}
+      />
+      <Tabs.Screen
+        name="calendar"
+        options={{
+          title: "Calendar",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar" size={size} color={color} />
           ),
@@ -52,12 +61,6 @@ export default function RootLayout() {
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
           ),
-        }}
-      />
-      <Tabs.Screen
-        name="calendar"
-        options={{
-          href: null, // Hide from tab bar - functionality moved to Study tab
         }}
       />
       <Tabs.Screen
