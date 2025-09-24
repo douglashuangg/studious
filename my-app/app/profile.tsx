@@ -102,7 +102,7 @@ export default function Profile() {
     );
   };
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header with Profile Picture and Followers/Following */}
       <View style={styles.header}>
         <View style={styles.profileSection}>

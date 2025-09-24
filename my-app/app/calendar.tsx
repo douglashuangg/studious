@@ -768,22 +768,6 @@ export default function Calendar() {
                     );
                   })}
 
-                  {/* Test session block 4:31-4:33 PM */}
-                  {slot.hour === 16 && slot.minute === 30 && (
-                    <View style={[
-                      styles.sessionBlock,
-                      {
-                        backgroundColor: "#FF6B6B",
-                        height: 2, // 2 minutes = 4px, but let's make it 2px for a thin line
-                        top: 2, // 1 minute into slot (1 × 2px = 2px)
-                        left: 0,
-                        right: 0,
-                      }
-                    ]}>
-                      <Text style={styles.sessionText}>Test 4:31-4:33</Text>
-                      <Text style={styles.sessionTime}>4:31 PM - 4:33 PM</Text>
-                    </View>
-                  )}
 
                   {/* Study session blocks - only render at the start of each session */}
                   {session && minute === 0 && (() => {

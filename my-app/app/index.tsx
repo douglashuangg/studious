@@ -143,7 +143,7 @@ export default function Index() {
   };
 
   return (
-    <ScrollView style={styles.container}>
+    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Stories Section */}
       <View style={styles.storiesContainer}>
         <Text style={styles.storiesTitle}>Currently Studying</Text>
