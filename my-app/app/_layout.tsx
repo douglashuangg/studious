@@ -1,10 +1,14 @@
 import { Tabs } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { AuthProvider } from "../contexts/AuthContext";
+import AuthWrapper from "../components/AuthWrapper";
 
 export default function RootLayout() {
   return (
-    <Tabs
+    <AuthProvider>
+      <AuthWrapper>
+        <Tabs
       screenOptions={{
         tabBarActiveTintColor: "#2D5A27",
         tabBarInactiveTintColor: "#8B9A8B",
@@ -93,5 +97,7 @@ export default function RootLayout() {
         }}
       />
     </Tabs>
+      </AuthWrapper>
+    </AuthProvider>
   );
 }

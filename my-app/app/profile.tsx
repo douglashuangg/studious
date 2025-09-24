@@ -1,12 +1,13 @@
-import { Text, View, StyleSheet, Image, TouchableOpacity, ScrollView } from "react-native";
+import { Text, View, StyleSheet, Image, TouchableOpacity, ScrollView, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
-import { collection, query, orderBy, getDocs } from "firebase/firestore";
-import { db } from "../firebase/firebaseInit";
+import { getStudySessions } from "../firebase/studySessionService";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function Profile() {
   const router = useRouter();
+  const { user, logout } = useAuth();
   const [studySessions, setStudySessions] = useState([]);
   const [loading, setLoading] = useState(true);
   const [totalStudyHours, setTotalStudyHours] = useState(0);
@@ -16,15 +17,7 @@ export default function Profile() {
   useEffect(() => {
     const fetchStudySessions = async () => {
       try {
-        const sessionsRef = collection(db, "studySessions");
-        const q = query(sessionsRef, orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
-        
-        const sessions = [];
-        querySnapshot.forEach((doc) => {
-          sessions.push({ id: doc.id, ...doc.data() });
-        });
-        
+        const sessions = await getStudySessions();
         setStudySessions(sessions);
         calculateStats(sessions);
         setLoading(false);
@@ -87,6 +80,27 @@ export default function Profile() {
       return 'Just now';
     }
   };
+
+  const handleLogout = () => {
+    Alert.alert(
+      'Logout',
+      'Are you sure you want to logout?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        { 
+          text: 'Logout', 
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              await logout();
+            } catch (error) {
+              Alert.alert('Error', 'Failed to logout');
+            }
+          }
+        }
+      ]
+    );
+  };
   return (
     <ScrollView style={styles.container}>
       {/* Header with Profile Picture and Followers/Following */}
@@ -148,8 +162,8 @@ export default function Profile() {
         <TouchableOpacity style={styles.editProfileButton}>
           <Text style={styles.editProfileText}>Edit Profile</Text>
         </TouchableOpacity>
-        <TouchableOpacity style={styles.settingsButton}>
-          <Ionicons name="settings" size={24} color="#2D5A27" />
+        <TouchableOpacity style={styles.settingsButton} onPress={handleLogout}>
+          <Ionicons name="log-out" size={24} color="#2D5A27" />
         </TouchableOpacity>
       </View>
 

@@ -2,8 +2,7 @@ import { Text, View, StyleSheet, ScrollView, TouchableOpacity } from "react-nati
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
-import { collection, query, orderBy, getDocs } from "firebase/firestore";
-import { db } from "../firebase/firebaseInit";
+import { getStudySessions } from "../firebase/studySessionService";
 
 export default function Statistics() {
   const router = useRouter();
@@ -14,15 +13,7 @@ export default function Statistics() {
   useEffect(() => {
     const fetchStudySessions = async () => {
       try {
-        const sessionsRef = collection(db, "studySessions");
-        const q = query(sessionsRef, orderBy("createdAt", "desc"));
-        const querySnapshot = await getDocs(q);
-        
-        const sessions = [];
-        querySnapshot.forEach((doc) => {
-          sessions.push({ id: doc.id, ...doc.data() });
-        });
-        
+        const sessions = await getStudySessions();
         setStudySessions(sessions);
         setLoading(false);
       } catch (error) {

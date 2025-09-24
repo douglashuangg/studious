@@ -11,7 +11,7 @@ import {
   where,
   onSnapshot
 } from "firebase/firestore";
-import { db } from "./firebaseInit.js";
+import { db, auth } from "./firebaseInit.js";
 
 // Collection name for study sessions
 const STUDY_SESSIONS_COLLECTION = "studySessions";
@@ -19,8 +19,14 @@ const STUDY_SESSIONS_COLLECTION = "studySessions";
 // Save a new study session
 export const saveStudySession = async (sessionData) => {
   try {
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error("User must be authenticated to save study sessions");
+    }
+
     const docRef = await addDoc(collection(db, STUDY_SESSIONS_COLLECTION), {
       ...sessionData,
+      userId: user.uid, // Link to authenticated user
       // Use the provided createdAt and updatedAt timestamps
       // Only set current time if not provided
       createdAt: sessionData.createdAt || new Date(),
@@ -34,10 +40,20 @@ export const saveStudySession = async (sessionData) => {
   }
 };
 
-// Get all study sessions
+// Get all study sessions for the current user
 export const getStudySessions = async () => {
   try {
-    const querySnapshot = await getDocs(collection(db, STUDY_SESSIONS_COLLECTION));
+    const user = auth.currentUser;
+    if (!user) {
+      throw new Error("User must be authenticated to get study sessions");
+    }
+
+    // Get all sessions for the user (without orderBy to avoid composite index)
+    const q = query(
+      collection(db, STUDY_SESSIONS_COLLECTION),
+      where("userId", "==", user.uid)
+    );
+    const querySnapshot = await getDocs(q);
     const sessions = [];
     querySnapshot.forEach((doc) => {
       sessions.push({
@@ -45,6 +61,14 @@ export const getStudySessions = async () => {
         ...doc.data()
       });
     });
+    
+    // Sort in JavaScript instead of Firestore
+    sessions.sort((a, b) => {
+      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+      return dateB.getTime() - dateA.getTime(); // Descending order
+    });
+    
     return sessions;
   } catch (error) {
     console.error("Error getting study sessions: ", error);
@@ -55,10 +79,10 @@ export const getStudySessions = async () => {
 // Get study sessions for a specific user
 export const getUserStudySessions = async (userId) => {
   try {
+    // Get all sessions for the user (without orderBy to avoid composite index)
     const q = query(
       collection(db, STUDY_SESSIONS_COLLECTION),
-      where("userId", "==", userId),
-      orderBy("createdAt", "desc")
+      where("userId", "==", userId)
     );
     const querySnapshot = await getDocs(q);
     const sessions = [];
@@ -68,6 +92,14 @@ export const getUserStudySessions = async (userId) => {
         ...doc.data()
       });
     });
+    
+    // Sort in JavaScript instead of Firestore
+    sessions.sort((a, b) => {
+      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+      return dateB.getTime() - dateA.getTime(); // Descending order
+    });
+    
     return sessions;
   } catch (error) {
     console.error("Error getting user study sessions: ", error);
@@ -105,7 +137,6 @@ export const deleteStudySession = async (sessionId) => {
 export const subscribeToStudySessions = (callback) => {
   const q = query(
     collection(db, STUDY_SESSIONS_COLLECTION),
-    orderBy("createdAt", "desc"),
     limit(50)
   );
   
@@ -117,6 +148,14 @@ export const subscribeToStudySessions = (callback) => {
         ...doc.data()
       });
     });
+    
+    // Sort in JavaScript instead of Firestore
+    sessions.sort((a, b) => {
+      const dateA = a.createdAt?.toDate ? a.createdAt.toDate() : new Date(a.createdAt);
+      const dateB = b.createdAt?.toDate ? b.createdAt.toDate() : new Date(b.createdAt);
+      return dateB.getTime() - dateA.getTime(); // Descending order
+    });
+    
     callback(sessions);
   });
 };
