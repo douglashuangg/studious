@@ -1,6 +1,7 @@
 import { Text, View, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert, Modal, Dimensions, AppState } from "react-native";
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from "@expo/vector-icons";
-import { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { saveStudySession } from "../firebase/studySessionService.js";
 import { 
   startBackgroundTimer, 
@@ -443,6 +444,22 @@ export default function Calendar() {
     };
     loadSessions();
   }, [selectedDate]); // Reload when selectedDate changes
+
+  // Auto-refresh when tab is focused
+  useFocusEffect(
+    React.useCallback(() => {
+      const refreshSessions = async () => {
+        try {
+          const sessions = await getStudySessions();
+          setStudySessions(sessions);
+        } catch (error) {
+          console.error("Error refreshing study sessions:", error);
+        }
+      };
+
+      refreshSessions();
+    }, [])
+  );
 
   // Background timer functionality
   useEffect(() => {
