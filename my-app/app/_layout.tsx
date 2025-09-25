@@ -105,6 +105,22 @@ export default function RootLayout() {
           href: null, // Hide from tab bar
         }}
       />
+      <Tabs.Screen
+        name="setup-profile"
+        options={{
+          href: null, // Hide from tab bar
+          headerShown: false, // Hide the top header
+          tabBarStyle: { display: 'none' }, // Completely hide tab bar
+        }}
+      />
+      <Tabs.Screen
+        name="setup-profile-picture"
+        options={{
+          href: null, // Hide from tab bar
+          headerShown: false, // Hide the top header
+          tabBarStyle: { display: 'none' }, // Completely hide tab bar
+        }}
+      />
     </Tabs>
       </AuthWrapper>
     </AuthProvider>

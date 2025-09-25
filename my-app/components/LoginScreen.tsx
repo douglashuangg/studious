@@ -36,7 +36,6 @@ export default function LoginScreen() {
     try {
       if (isRegistering) {
         await register(email, password);
-        Alert.alert('Success', 'Account created successfully!');
       } else {
         await login(email, password);
       }

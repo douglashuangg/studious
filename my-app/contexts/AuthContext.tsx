@@ -5,9 +5,11 @@ import { auth } from '../firebase/firebaseInit';
 interface AuthContextType {
   user: FirebaseUser | null;
   loading: boolean;
+  isNewUser: boolean;
   login: (email: string, password: string) => Promise<void>;
   register: (email: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  clearNewUserFlag: () => void;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -23,6 +25,7 @@ export const useAuth = () => {
 export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
   const [user, setUser] = useState<FirebaseUser | null>(null);
   const [loading, setLoading] = useState(true);
+  const [isNewUser, setIsNewUser] = useState(false);
 
   useEffect(() => {
     const unsubscribe = onAuthStateChanged(auth, (user) => {
@@ -44,6 +47,7 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const register = async (email: string, password: string) => {
     try {
       await createUserWithEmailAndPassword(auth, email, password);
+      setIsNewUser(true); // Mark as new user after successful registration
     } catch (error) {
       throw error;
     }
@@ -52,17 +56,24 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
   const logout = async () => {
     try {
       await firebaseSignOut(auth);
+      setIsNewUser(false); // Reset new user flag on logout
     } catch (error) {
       throw error;
     }
   };
 
+  const clearNewUserFlag = () => {
+    setIsNewUser(false);
+  };
+
   const value = {
     user,
     loading,
+    isNewUser,
     login,
     register,
     logout,
+    clearNewUserFlag,
   };
 
   return (

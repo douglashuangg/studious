@@ -1,14 +1,24 @@
-import React from 'react';
+import React, { useEffect } from 'react';
 import { View, ActivityIndicator, StyleSheet } from 'react-native';
 import { useAuth } from '../contexts/AuthContext';
 import LoginScreen from './LoginScreen';
+import { useRouter } from 'expo-router';
 
 interface AuthWrapperProps {
   children: React.ReactNode;
 }
 
 export default function AuthWrapper({ children }: AuthWrapperProps) {
-  const { user, loading } = useAuth();
+  const { user, loading, isNewUser, clearNewUserFlag } = useAuth();
+  const router = useRouter();
+
+  useEffect(() => {
+    if (user && isNewUser) {
+      // New user just signed up, redirect to setup profile
+      router.replace('/setup-profile');
+      clearNewUserFlag();
+    }
+  }, [user, isNewUser]);
 
   if (loading) {
     return (
