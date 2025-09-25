@@ -156,7 +156,7 @@ export default function Index() {
             <TouchableOpacity 
               key={story.id} 
               style={styles.storyItem}
-              onPress={() => router.push(`/user-profile/${story.id}`)}
+              onPress={() => router.push(`/user-profile/external-user-profile?id=${story.id}`)}
             >
               <View style={[
                 styles.storyRing,
@@ -220,7 +220,7 @@ export default function Index() {
           <View key={summary.id} style={styles.summaryCard}>
             <TouchableOpacity 
               style={styles.summaryHeader}
-              onPress={() => router.push(`/user-profile/${summary.id}`)}
+              onPress={() => router.push(`/user-profile/external-user-profile?id=${summary.id}`)}
             >
               <Image source={{ uri: summary.avatar }} style={styles.avatar} />
               <View style={styles.summaryInfo}>

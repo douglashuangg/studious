@@ -97,13 +97,20 @@ export default function Search() {
   };
 
   const handleUserPress = (userId: string) => {
-    router.push(`/user-profile/${userId}`);
+    router.push(`/user-profile/external-user-profile?id=${userId}`);
+  };
+
+  const handleBack = () => {
+    setSearchQuery("");
+    setUsers([]);
+    setHasSearched(false);
+    router.back();
   };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Ionicons name="chevron-back" size={24} color="#2D5A27" />
         </TouchableOpacity>
         <Text style={styles.title}>Search People</Text>

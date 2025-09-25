@@ -94,9 +94,10 @@ export default function RootLayout() {
         }}
       />
       <Tabs.Screen
-        name="user-profile/[id]"
+        name="user-profile/external-user-profile"
         options={{
           href: null, // Hide from tab bar
+          headerShown: false, // Hide the top header
         }}
       />
       <Tabs.Screen
