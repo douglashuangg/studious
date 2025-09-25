@@ -144,6 +144,16 @@ export default function ExternalUserProfile() {
     return streak;
   };
 
+  // Refresh followers count
+  const refreshFollowersCount = async () => {
+    try {
+      const followersData = await getFollowers(id as string);
+      setFollowers(followersData);
+    } catch (error) {
+      console.error('Error refreshing followers count:', error);
+    }
+  };
+
   // Handle follow/unfollow
   const handleFollow = async () => {
     if (!currentUser) {
@@ -168,6 +178,9 @@ export default function ExternalUserProfile() {
       } else {
         await followUser(currentUser.uid, id as string);
       }
+      
+      // Refresh followers count after successful follow/unfollow
+      await refreshFollowersCount();
     } catch (error) {
       console.error('Error following user:', error);
       // Revert UI state on error
@@ -188,10 +201,11 @@ export default function ExternalUserProfile() {
     }
   };
 
-  // Refresh follow status when page comes into focus
+  // Refresh follow status and followers count when page comes into focus
   useFocusEffect(
     React.useCallback(() => {
       refreshFollowStatus();
+      refreshFollowersCount();
     }, [currentUser, id])
   );
 

@@ -133,23 +133,25 @@ export default function Followers() {
                 <Text style={styles.username}>@{item.username}</Text>
                 {item.bio && <Text style={styles.bio} numberOfLines={1}>{item.bio}</Text>}
               </View>
-              <TouchableOpacity 
-                style={[
-                  styles.followButton,
-                  followingStatus[item.id] ? styles.followingButton : styles.followButton
-                ]}
-                onPress={(e) => {
-                  e.stopPropagation();
-                  handleFollowToggle(item.id);
-                }}
-              >
-                <Text style={[
-                  styles.followButtonText,
-                  followingStatus[item.id] ? styles.followingButtonText : styles.followButtonText
-                ]}>
-                  {followingStatus[item.id] ? 'Following' : 'Follow back'}
-                </Text>
-              </TouchableOpacity>
+              {targetUserId === user?.uid && (
+                <TouchableOpacity 
+                  style={[
+                    styles.followButton,
+                    followingStatus[item.id] ? styles.followingButton : styles.followButton
+                  ]}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleFollowToggle(item.id);
+                  }}
+                >
+                  <Text style={[
+                    styles.followButtonText,
+                    followingStatus[item.id] ? styles.followingButtonText : styles.followButtonText
+                  ]}>
+                    {followingStatus[item.id] ? 'Following' : 'Follow back'}
+                  </Text>
+                </TouchableOpacity>
+              )}
             </TouchableOpacity>
           )}
           ItemSeparatorComponent={() => <View style={styles.separator} />}

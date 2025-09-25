@@ -106,7 +106,7 @@ export default function Following() {
                 <Text style={styles.username}>@{item.username}</Text>
                 {item.bio && <Text style={styles.bio} numberOfLines={1}>{item.bio}</Text>}
               </View>
-              {targetUserId === user?.uid ? (
+              {targetUserId === user?.uid && (
                 <TouchableOpacity 
                   style={styles.unfollowButton}
                   onPress={(e) => {
@@ -116,10 +116,6 @@ export default function Following() {
                 >
                   <Text style={styles.unfollowButtonText}>Unfollow</Text>
                 </TouchableOpacity>
-              ) : (
-                <View style={styles.viewButton}>
-                  <Text style={styles.viewButtonText}>View</Text>
-                </View>
               )}
             </TouchableOpacity>
           )}

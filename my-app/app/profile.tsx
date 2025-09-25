@@ -170,11 +170,11 @@ export default function Profile() {
           </View>
           
           <View style={styles.followContainer}>
-            <TouchableOpacity style={styles.followItem} onPress={() => navigateToFollowers(user?.uid, 'profile')}>
+            <TouchableOpacity style={styles.followItem} onPress={() => user?.uid && navigateToFollowers(user.uid, 'profile')}>
               <Text style={styles.followNumber}>{followCounts.followerCount}</Text>
               <Text style={styles.followLabel}>Followers</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.followItem} onPress={() => navigateToFollowing(user?.uid, 'profile')}>
+            <TouchableOpacity style={styles.followItem} onPress={() => user?.uid && navigateToFollowing(user.uid, 'profile')}>
               <Text style={styles.followNumber}>{followCounts.followingCount}</Text>
               <Text style={styles.followLabel}>Following</Text>
             </TouchableOpacity>
@@ -187,14 +187,9 @@ export default function Profile() {
         <Text style={styles.username}>
           @{userProfile?.username || user?.email?.split('@')[0] || 'user'}
         </Text>
-        <Text style={styles.bio}>
-          {userProfile?.bio || 'No bio available'}
-        </Text>
-        {/* Debug info - remove in production */}
-        {__DEV__ && (
-          <Text style={{fontSize: 10, color: '#999', marginTop: 5}}>
-            Debug: userProfile={JSON.stringify(userProfile?.displayName)}, 
-            user={JSON.stringify(user?.displayName)}
+        {userProfile?.bio && (
+          <Text style={styles.bio}>
+            {userProfile.bio}
           </Text>
         )}
       </View>

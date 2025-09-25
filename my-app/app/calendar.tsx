@@ -523,40 +523,6 @@ export default function Calendar() {
   //   return () => subscription?.remove();
   // }, [isRecording, isPaused, sessionStartTime, subject, notes, seconds]);
 
-  // Function to add test session to Firebase
-  const addTestSession = async () => {
-    try {
-      const { saveStudySession } = await import("../firebase/studySessionService.js");
-      
-      // Create session for CURRENT TIME
-      const now = new Date();
-      
-      // Create end time - 1 hour later from current time
-      const endTime = new Date(now.getTime() + 3600000); // Add 1 hour (3600000 ms)
-      
-      const sessionData = {
-        subject: "Test Study Session",
-        duration: 3600, // 1 hour in seconds
-        notes: `Test session from ${now.toLocaleTimeString()} to ${endTime.toLocaleTimeString()}`,
-        color: "#FF6B6B",
-        isActive: false,
-        createdAt: now,
-        updatedAt: new Date(now.getTime() + 3600000) // now + 1 hour
-      };
-      
-      const sessionId = await saveStudySession(sessionData);
-      // Test session added
-      
-      // Reload sessions to show the new one
-      const sessions = await getStudySessions();
-      setStudySessions(sessions);
-      
-      Alert.alert("Success", "Test session added to Firebase!");
-    } catch (error) {
-      console.error("Error adding test session:", error);
-      Alert.alert("Error", "Failed to add test session");
-    }
-  };
 
   const getSessionForTime = (hour: number, minute: number) => {
     const timeInHours = hour + minute / 60;
@@ -827,12 +793,6 @@ export default function Calendar() {
 
       {/* Fixed Today's Sessions Section */}
       <View style={styles.fixedSessionsContainer}>
-        {/* Test Button */}
-        <View style={styles.testButtonContainer}>
-          <TouchableOpacity style={styles.testButton} onPress={addTestSession}>
-            <Text style={styles.testButtonText}>Add Test Session (Current Time + 1hr)</Text>
-          </TouchableOpacity>
-        </View>
 
         {/* Legend */}
         <View style={styles.legend}>
@@ -1489,25 +1449,6 @@ const styles = StyleSheet.create({
   recentDuration: {
     fontSize: 15,
     color: "#8E8E93",
-  },
-  testButtonContainer: {
-    paddingHorizontal: 8,
-    paddingVertical: 4,
-    backgroundColor: "#ffffff",
-    borderTopWidth: 1,
-    borderTopColor: "#E5E5EA",
-  },
-  testButton: {
-    backgroundColor: "#2D5A27",
-    paddingVertical: 6,
-    paddingHorizontal: 12,
-    borderRadius: 4,
-    alignItems: "center",
-  },
-  testButtonText: {
-    color: "#ffffff",
-    fontSize: 12,
-    fontWeight: "600",
   },
   debugScrollView: {
     maxHeight: 200, // Limit height to 200px
