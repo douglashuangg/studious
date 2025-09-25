@@ -1,9 +1,127 @@
-import { Text, View, StyleSheet, ScrollView, Image, TouchableOpacity } from "react-native";
+import { Text, View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
+import { useState, useEffect } from "react";
+import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
+import { db } from "../firebase/firebaseInit";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function Index() {
   const router = useRouter();
+  const { user } = useAuth();
+  
+  // State for real Firebase data
+  const [todayHours, setTodayHours] = useState(0);
+  const [streak, setStreak] = useState(0);
+  const [totalHours, setTotalHours] = useState(0);
+  const [loading, setLoading] = useState(true);
+
+  // Load user's study data from Firebase
+  useEffect(() => {
+    const loadUserStats = async () => {
+      if (!user) {
+        setLoading(false);
+        return;
+      }
+
+      try {
+        setLoading(true);
+        
+        // Get all study sessions for the user
+        const sessionsQuery = query(
+          collection(db, 'studySessions'),
+          where('userId', '==', user.uid)
+        );
+        const sessionsSnapshot = await getDocs(sessionsQuery);
+        const sessions = sessionsSnapshot.docs.map(doc => ({
+          id: doc.id,
+          ...doc.data()
+        })).sort((a, b) => {
+          const dateA = a.startTime?.toDate ? a.startTime.toDate() : new Date(a.startTime);
+          const dateB = b.startTime?.toDate ? b.startTime.toDate() : new Date(b.startTime);
+          return dateB.getTime() - dateA.getTime(); // Sort by newest first
+        });
+
+        // Calculate today's hours
+        const today = new Date();
+        today.setHours(0, 0, 0, 0);
+        const tomorrow = new Date(today);
+        tomorrow.setDate(tomorrow.getDate() + 1);
+
+        let todayTotalHours = 0;
+        let totalStudyHours = 0;
+
+        sessions.forEach((session: any) => {
+          let sessionDuration = 0;
+          if (session.startTime && session.endTime) {
+            const start = session.startTime?.toDate ? session.startTime.toDate() : new Date(session.startTime);
+            const end = session.endTime?.toDate ? session.endTime.toDate() : new Date(session.endTime);
+            const durationMs = end.getTime() - start.getTime();
+            sessionDuration = durationMs / (1000 * 60 * 60); // Convert to hours
+          } else if (session.duration) {
+            sessionDuration = session.duration / 3600; // Convert seconds to hours
+          }
+
+          totalStudyHours += sessionDuration;
+
+          // Check if session was today
+          const sessionDate = session.startTime?.toDate ? session.startTime.toDate() : new Date(session.startTime);
+          if (sessionDate >= today && sessionDate < tomorrow) {
+            todayTotalHours += sessionDuration;
+          }
+        });
+
+        // Calculate streak
+        const streak = calculateStreak(sessions);
+
+        setTodayHours(Math.round(todayTotalHours * 10) / 10);
+        setTotalHours(Math.round(totalStudyHours * 10) / 10);
+        setStreak(streak);
+
+      } catch (error) {
+        console.error('Error loading user stats:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserStats();
+  }, [user]);
+
+  // Calculate study streak
+  const calculateStreak = (sessions: any[]) => {
+    if (sessions.length === 0) return 0;
+    
+    const today = new Date();
+    const sortedSessions = sessions
+      .map(session => new Date(session.startTime?.toDate() || session.startTime))
+      .sort((a, b) => b.getTime() - a.getTime());
+    
+    let streak = 0;
+    let currentDate = new Date(today);
+    
+    for (const sessionDate of sortedSessions) {
+      const sessionDay = new Date(sessionDate);
+      sessionDay.setHours(0, 0, 0, 0);
+      currentDate.setHours(0, 0, 0, 0);
+      
+      if (sessionDay.getTime() === currentDate.getTime()) {
+        streak++;
+        currentDate.setDate(currentDate.getDate() - 1);
+      } else if (sessionDay.getTime() < currentDate.getTime()) {
+        break;
+      }
+    }
+    
+    return streak;
+  };
+
+  // Format time duration
+  const formatTime = (hours: number) => {
+    const wholeHours = Math.floor(hours);
+    const minutes = Math.round((hours - wholeHours) * 60);
+    return `${wholeHours}h ${minutes}m`;
+  };
   
   // Mock data for currently studying stories
   const studyingStories = [
@@ -186,17 +304,23 @@ export default function Index() {
       {/* Quick Stats */}
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>2h 30m</Text>
+          <Text style={styles.statNumber}>
+            {loading ? "..." : formatTime(todayHours)}
+          </Text>
           <Text style={styles.statLabel}>Today</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>15</Text>
+          <Text style={styles.statNumber}>
+            {loading ? "..." : streak}
+          </Text>
           <Text style={styles.statLabel}>Streak</Text>
         </View>
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
-          <Text style={styles.statNumber}>1,234</Text>
+          <Text style={styles.statNumber}>
+            {loading ? "..." : totalHours.toFixed(1)}
+          </Text>
           <Text style={styles.statLabel}>Total Hours</Text>
         </View>
       </View>

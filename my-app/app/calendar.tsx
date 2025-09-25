@@ -1147,7 +1147,7 @@ const styles = StyleSheet.create({
   },
   legend: {
     backgroundColor: "#ffffff",
-    padding: 20,
+    padding: 8,
     borderTopWidth: 1,
     borderTopColor: "#E5E5EA",
   },
@@ -1155,7 +1155,7 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
-    marginBottom: 15,
+    marginBottom: 4,
   },
   legendTitle: {
     fontSize: 18,
@@ -1178,14 +1178,14 @@ const styles = StyleSheet.create({
   legendItem: {
     flexDirection: "row",
     alignItems: "flex-start",
-    marginBottom: 12,
-    padding: 12,
+    marginBottom: 8,
+    padding: 8,
     backgroundColor: "#f8f9fa",
-    borderRadius: 8,
+    borderRadius: 6,
   },
   legendContent: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 8,
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
@@ -1491,22 +1491,22 @@ const styles = StyleSheet.create({
     color: "#8E8E93",
   },
   testButtonContainer: {
-    paddingHorizontal: 20,
-    paddingVertical: 10,
+    paddingHorizontal: 8,
+    paddingVertical: 4,
     backgroundColor: "#ffffff",
     borderTopWidth: 1,
     borderTopColor: "#E5E5EA",
   },
   testButton: {
     backgroundColor: "#2D5A27",
-    paddingVertical: 12,
-    paddingHorizontal: 20,
-    borderRadius: 8,
+    paddingVertical: 6,
+    paddingHorizontal: 12,
+    borderRadius: 4,
     alignItems: "center",
   },
   testButtonText: {
     color: "#ffffff",
-    fontSize: 16,
+    fontSize: 12,
     fontWeight: "600",
   },
   debugScrollView: {
@@ -1535,6 +1535,6 @@ const styles = StyleSheet.create({
   },
   sessionsScrollView: {
     maxHeight: 150, // Scrollable area within the fixed container
-    paddingHorizontal: 20,
+    paddingHorizontal: 12,
   },
 });
