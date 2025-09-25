@@ -1,21 +1,92 @@
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput } from "react-native";
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
-import { useState } from "react";
-
-const MOCK_USERS = [
-  { id: "1", name: "Alice Johnson", username: "@alicej", avatar: "https://via.placeholder.com/60x60/FF6B6B/FFFFFF?text=A", isFollowing: false },
-  { id: "2", name: "Bob Smith", username: "@bobsmith", avatar: "https://via.placeholder.com/60x60/4ECDC4/FFFFFF?text=B", isFollowing: false },
-  { id: "3", name: "Carol Davis", username: "@carold", avatar: "https://via.placeholder.com/60x60/45B7D1/FFFFFF?text=C", isFollowing: true },
-  { id: "4", name: "David Wilson", username: "@davidw", avatar: "https://via.placeholder.com/60x60/96CEB4/FFFFFF?text=D", isFollowing: false },
-  { id: "5", name: "Emma Brown", username: "@emmab", avatar: "https://via.placeholder.com/60x60/FFEAA7/FFFFFF?text=E", isFollowing: false },
-  { id: "6", name: "Frank Miller", username: "@frankm", avatar: "https://via.placeholder.com/60x60/DDA0DD/FFFFFF?text=F", isFollowing: true },
-];
+import { useState, useEffect } from "react";
+import { collection, query, where, getDocs, orderBy, limit, addDoc, deleteDoc, doc } from "firebase/firestore";
+import { db } from "../firebase/firebaseInit";
+import { useAuth } from "../contexts/AuthContext";
 
 export default function Search() {
   const router = useRouter();
+  const { user: currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
-  const [users, setUsers] = useState(MOCK_USERS);
+  const [users, setUsers] = useState<any[]>([]);
+  const [loading, setLoading] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
+
+  // Search users in Firebase
+  const searchUsers = async (searchTerm: string) => {
+    if (!searchTerm.trim()) {
+      setUsers([]);
+      setHasSearched(false);
+      return;
+    }
+
+    try {
+      setLoading(true);
+      setHasSearched(true);
+      
+      const usersRef = collection(db, 'users');
+      
+      // Search by displayName (case insensitive)
+      const nameQuery = query(usersRef,
+        where('displayName', '>=', searchTerm),
+        where('displayName', '<=', searchTerm + '\uf8ff'),
+        orderBy('displayName'),
+        limit(20)
+      );
+
+      const nameSnapshot = await getDocs(nameQuery);
+      const nameResults = nameSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        avatar: doc.data().avatar || `https://via.placeholder.com/60x60/2D5A27/FFFFFF?text=${doc.data().displayName?.charAt(0) || 'U'}`,
+        isFollowing: false // Will be updated based on follow status
+      }));
+
+      // Search by email (for username-like searches)
+      const emailQuery = query(usersRef,
+        where('email', '>=', searchTerm),
+        where('email', '<=', searchTerm + '\uf8ff'),
+        orderBy('email'),
+        limit(20)
+      );
+
+      const emailSnapshot = await getDocs(emailQuery);
+      const emailResults = emailSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data(),
+        avatar: doc.data().avatar || `https://via.placeholder.com/60x60/2D5A27/FFFFFF?text=${doc.data().displayName?.charAt(0) || 'U'}`,
+        isFollowing: false
+      }));
+
+      // Combine and deduplicate results
+      const allResults = [...nameResults, ...emailResults];
+      const uniqueResults = allResults.filter((user, index, self) => 
+        index === self.findIndex(u => u.id === user.id)
+      );
+
+      // Filter out current user
+      const filteredResults = uniqueResults.filter(user => user.id !== currentUser?.uid);
+      
+      setUsers(filteredResults);
+    } catch (error) {
+      console.error('Error searching users:', error);
+      Alert.alert("Error", "Failed to search users. Please try again.");
+      setUsers([]);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // Handle search input with debouncing
+  useEffect(() => {
+    const timeoutId = setTimeout(() => {
+      searchUsers(searchQuery);
+    }, 500); // 500ms debounce
+
+    return () => clearTimeout(timeoutId);
+  }, [searchQuery]);
 
   const handleFollow = (userId: string) => {
     setUsers(users.map(user => 
@@ -25,10 +96,9 @@ export default function Search() {
     ));
   };
 
-  const filteredUsers = users.filter(user =>
-    user.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-    user.username.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+  const handleUserPress = (userId: string) => {
+    router.push(`/user-profile/${userId}`);
+  };
 
   return (
     <View style={styles.container}>
@@ -53,36 +123,50 @@ export default function Search() {
         </View>
       </View>
 
-      <FlatList
-        data={filteredUsers}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => (
-          <View style={styles.userItem}>
-            <Image source={{ uri: item.avatar }} style={styles.avatar} />
-            <View style={styles.userInfo}>
-              <Text style={styles.userName}>{item.name}</Text>
-              <Text style={styles.userUsername}>{item.username}</Text>
-            </View>
-            <TouchableOpacity
-              style={[styles.followButton, item.isFollowing && styles.followingButton]}
-              onPress={() => handleFollow(item.id)}
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2D5A27" />
+          <Text style={styles.loadingText}>Searching users...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={users}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item }) => (
+            <TouchableOpacity 
+              style={styles.userItem} 
+              onPress={() => handleUserPress(item.id)}
             >
-              <Text style={[styles.followButtonText, item.isFollowing && styles.followingButtonText]}>
-                {item.isFollowing ? "Following" : "Follow"}
-              </Text>
+              <Image source={{ uri: item.avatar }} style={styles.avatar} />
+              <View style={styles.userInfo}>
+                <Text style={styles.userName}>{item.displayName || 'Anonymous User'}</Text>
+                <Text style={styles.userUsername}>@{item.username || item.email?.split('@')[0] || 'user'}</Text>
+              </View>
+              <TouchableOpacity
+                style={[styles.followButton, item.isFollowing && styles.followingButton]}
+                onPress={() => handleFollow(item.id)}
+              >
+                <Text style={[styles.followButtonText, item.isFollowing && styles.followingButtonText]}>
+                  {item.isFollowing ? "Following" : "Follow"}
+                </Text>
+              </TouchableOpacity>
             </TouchableOpacity>
-          </View>
-        )}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-        ListEmptyComponent={
-          <View style={styles.emptyContainer}>
-            <Ionicons name="search" size={48} color="#ccc" />
-            <Text style={styles.emptyText}>No users found</Text>
-            <Text style={styles.emptySubtext}>Try searching with different keywords</Text>
-          </View>
-        }
-      />
+          )}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ListEmptyComponent={
+            <View style={styles.emptyContainer}>
+              <Ionicons name="search" size={48} color="#ccc" />
+              <Text style={styles.emptyText}>
+                {hasSearched ? "No users found" : "Search for users"}
+              </Text>
+              <Text style={styles.emptySubtext}>
+                {hasSearched ? "Try searching with different keywords" : "Enter a name or email to search"}
+              </Text>
+            </View>
+          }
+        />
+      )}
     </View>
   );
 }
@@ -200,6 +284,17 @@ const styles = StyleSheet.create({
     fontSize: 14,
     color: "#999",
     marginTop: 4,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: "center",
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: "#666",
   },
 });
 
