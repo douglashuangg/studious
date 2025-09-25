@@ -1,45 +1,137 @@
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { getFollowing, unfollowUser } from "../firebase/followService";
+import { navigateToExternalProfile, navigateBack } from "../utils/navigationUtils";
 
-const MOCK_FOLLOWING = [
-  { id: "1", name: "Alice Kim", username: "@alicek", avatar: "https://via.placeholder.com/60x60/FFD166/FFFFFF?text=A" },
-  { id: "2", name: "Brian Lee", username: "@brianl", avatar: "https://via.placeholder.com/60x60/06D6A0/FFFFFF?text=B" },
-  { id: "3", name: "Carla Diaz", username: "@carlad", avatar: "https://via.placeholder.com/60x60/118AB2/FFFFFF?text=C" },
-  { id: "4", name: "Daniel Wu", username: "@danielw", avatar: "https://via.placeholder.com/60x60/EF476F/FFFFFF?text=D" },
-];
+interface FollowingUser {
+  id: string;
+  displayName: string;
+  username: string;
+  bio: string;
+  profilePicture: string | null;
+  followerCount: number;
+  followingCount: number;
+  followedAt: any;
+}
 
 export default function Following() {
   const router = useRouter();
+  const { userId, returnTo, originalReturnTo } = useLocalSearchParams();
+  const { user } = useAuth();
+  const [following, setFollowing] = useState<FollowingUser[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [targetUserId, setTargetUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchFollowing = async () => {
+      if (!user) return;
+      
+      // Determine which user's following to show
+      const targetUser = userId as string || user.uid;
+      setTargetUserId(targetUser);
+      
+      try {
+        setLoading(true);
+        const followingData = await getFollowing(targetUser);
+        setFollowing(followingData);
+      } catch (error) {
+        console.error('Error fetching following:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFollowing();
+  }, [user, userId]);
+
+  const handleUnfollow = async (userId: string) => {
+    if (!user) return;
+    
+    try {
+      await unfollowUser(user.uid, userId);
+      // Remove from local state
+      setFollowing(prev => prev.filter(user => user.id !== userId));
+    } catch (error) {
+      console.error('Error unfollowing user:', error);
+    }
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.push("/profile")}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => {
+            if (returnTo && typeof returnTo === 'string') {
+              const additionalParams: { originalReturnTo?: string } = {};
+              if (originalReturnTo) additionalParams.originalReturnTo = originalReturnTo as string;
+              navigateBack(returnTo, userId as string, additionalParams);
+            } else {
+              router.back();
+            }
+          }}
+        >
           <Ionicons name="chevron-back" size={24} color="#2D5A27" />
         </TouchableOpacity>
         <Text style={styles.title}>Following</Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <FlatList
-        data={MOCK_FOLLOWING}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => (
-          <View style={styles.itemRow}>
-            <Image source={{ uri: item.avatar }} style={styles.avatar} />
-            <View style={styles.itemText}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.username}>{item.username}</Text>
-            </View>
-            <TouchableOpacity style={styles.unfollowButton}>
-              <Text style={styles.unfollowButtonText}>Unfollow</Text>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2D5A27" />
+          <Text style={styles.loadingText}>Loading following...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={following}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item }) => (
+            <TouchableOpacity 
+              style={styles.itemRow}
+              onPress={() => navigateToExternalProfile(item.id, returnTo as string, originalReturnTo as string)}
+            >
+              <Image 
+                source={{ 
+                  uri: item.profilePicture || `https://via.placeholder.com/60x60/2D5A27/FFFFFF?text=${item.displayName.charAt(0).toUpperCase()}` 
+                }} 
+                style={styles.avatar} 
+              />
+              <View style={styles.itemText}>
+                <Text style={styles.name}>{item.displayName}</Text>
+                <Text style={styles.username}>@{item.username}</Text>
+                {item.bio && <Text style={styles.bio} numberOfLines={1}>{item.bio}</Text>}
+              </View>
+              {targetUserId === user?.uid ? (
+                <TouchableOpacity 
+                  style={styles.unfollowButton}
+                  onPress={(e) => {
+                    e.stopPropagation();
+                    handleUnfollow(item.id);
+                  }}
+                >
+                  <Text style={styles.unfollowButtonText}>Unfollow</Text>
+                </TouchableOpacity>
+              ) : (
+                <View style={styles.viewButton}>
+                  <Text style={styles.viewButtonText}>View</Text>
+                </View>
+              )}
             </TouchableOpacity>
-          </View>
-        )}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-      />
+          )}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>Not following anyone yet</Text>
+              <Text style={styles.emptySubtext}>Find users to follow and start building your network!</Text>
+            </View>
+          )}
+        />
+      )}
     </View>
   );
 }
@@ -111,6 +203,50 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 12,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  bio: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
+  },
+  viewButton: {
+    backgroundColor: '#f0f0f0',
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 8,
+  },
+  viewButtonText: {
+    color: '#666',
+    fontSize: 14,
+    fontWeight: '600',
   },
 });
 

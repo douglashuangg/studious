@@ -1,45 +1,166 @@
-import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity } from "react-native";
+import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
+import { useState, useEffect } from "react";
+import { useAuth } from "../contexts/AuthContext";
+import { getFollowers, followUser, unfollowUser, isFollowing } from "../firebase/followService";
+import { navigateToExternalProfile, navigateBack } from "../utils/navigationUtils";
 
-const MOCK_FOLLOWERS = [
-  { id: "1", name: "Sarah Johnson", username: "@sarahj", avatar: "https://via.placeholder.com/60x60/FF6B6B/FFFFFF?text=S" },
-  { id: "2", name: "Mike Chen", username: "@mikechen", avatar: "https://via.placeholder.com/60x60/4ECDC4/FFFFFF?text=M" },
-  { id: "3", name: "Emma Wilson", username: "@emmaw", avatar: "https://via.placeholder.com/60x60/45B7D1/FFFFFF?text=E" },
-  { id: "4", name: "Alex Rodriguez", username: "@alexr", avatar: "https://via.placeholder.com/60x60/96CEB4/FFFFFF?text=A" },
-];
+interface Follower {
+  id: string;
+  displayName: string;
+  username: string;
+  bio: string;
+  profilePicture: string | null;
+  followerCount: number;
+  followingCount: number;
+  followedAt: any;
+}
 
 export default function Followers() {
   const router = useRouter();
+  const { userId, returnTo, originalReturnTo } = useLocalSearchParams();
+  const { user } = useAuth();
+  const [followers, setFollowers] = useState<Follower[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [followingStatus, setFollowingStatus] = useState<{[key: string]: boolean}>({});
+  const [targetUserId, setTargetUserId] = useState<string | null>(null);
+
+  useEffect(() => {
+    const fetchFollowers = async () => {
+      if (!user) return;
+      
+      // Determine which user's followers to show
+      const targetUser = userId as string || user.uid;
+      setTargetUserId(targetUser);
+      
+      try {
+        setLoading(true);
+        const followersData = await getFollowers(targetUser);
+        setFollowers(followersData);
+        
+        // Check follow status for each follower
+        const statusMap: { [key: string]: boolean } = {};
+        for (const follower of followersData) {
+          const isFollowingUser = await isFollowing(user.uid, follower.id);
+          statusMap[follower.id as string] = isFollowingUser;
+        }
+        setFollowingStatus(statusMap);
+      } catch (error) {
+        console.error('Error fetching followers:', error);
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    fetchFollowers();
+  }, [user, userId]);
+
+  const handleFollowToggle = async (followerId: string) => {
+    if (!user) return;
+    
+    const previousState = followingStatus[followerId];
+    
+    try {
+      // Update UI immediately
+      setFollowingStatus((prev: {[key: string]: boolean}) => ({
+        ...prev,
+        [followerId]: !previousState
+      }));
+      
+      // Then handle Firebase operation
+      if (previousState) {
+        await unfollowUser(user.uid, followerId);
+      } else {
+        await followUser(user.uid, followerId);
+      }
+    } catch (error) {
+      console.error('Error toggling follow status:', error);
+      // Revert UI state on error
+      setFollowingStatus((prev: {[key: string]: boolean}) => ({
+        ...prev,
+        [followerId]: previousState
+      }));
+    }
+  };
 
   return (
     <View style={styles.container}>
       <View style={styles.header}>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.push("/profile")}>
+        <TouchableOpacity 
+          style={styles.backButton} 
+          onPress={() => {
+            if (returnTo && typeof returnTo === 'string') {
+              const additionalParams: { originalReturnTo?: string } = {};
+              if (originalReturnTo) additionalParams.originalReturnTo = originalReturnTo as string;
+              navigateBack(returnTo, userId as string, additionalParams);
+            } else {
+              router.back();
+            }
+          }}
+        >
           <Ionicons name="chevron-back" size={24} color="#2D5A27" />
         </TouchableOpacity>
-        <Text style={styles.title}>Followers</Text>
+        <Text style={styles.title}>
+          {targetUserId === user?.uid ? 'Followers' : 'Followers'}
+        </Text>
         <View style={{ width: 40 }} />
       </View>
 
-      <FlatList
-        data={MOCK_FOLLOWERS}
-        keyExtractor={(item) => item.id}
-        contentContainerStyle={styles.listContent}
-        renderItem={({ item }) => (
-          <View style={styles.itemRow}>
-            <Image source={{ uri: item.avatar }} style={styles.avatar} />
-            <View style={styles.itemText}>
-              <Text style={styles.name}>{item.name}</Text>
-              <Text style={styles.username}>{item.username}</Text>
-            </View>
-            <TouchableOpacity style={styles.followButton}>
-              <Text style={styles.followButtonText}>Follow back</Text>
+      {loading ? (
+        <View style={styles.loadingContainer}>
+          <ActivityIndicator size="large" color="#2D5A27" />
+          <Text style={styles.loadingText}>Loading followers...</Text>
+        </View>
+      ) : (
+        <FlatList
+          data={followers}
+          keyExtractor={(item) => item.id}
+          contentContainerStyle={styles.listContent}
+          renderItem={({ item }) => (
+            <TouchableOpacity 
+              style={styles.itemRow}
+              onPress={() => navigateToExternalProfile(item.id, returnTo as string, originalReturnTo as string)}
+            >
+              <Image 
+                source={{ 
+                  uri: item.profilePicture || `https://via.placeholder.com/60x60/2D5A27/FFFFFF?text=${item.displayName.charAt(0).toUpperCase()}` 
+                }} 
+                style={styles.avatar} 
+              />
+              <View style={styles.itemText}>
+                <Text style={styles.name}>{item.displayName}</Text>
+                <Text style={styles.username}>@{item.username}</Text>
+                {item.bio && <Text style={styles.bio} numberOfLines={1}>{item.bio}</Text>}
+              </View>
+              <TouchableOpacity 
+                style={[
+                  styles.followButton,
+                  followingStatus[item.id] ? styles.followingButton : styles.followButton
+                ]}
+                onPress={(e) => {
+                  e.stopPropagation();
+                  handleFollowToggle(item.id);
+                }}
+              >
+                <Text style={[
+                  styles.followButtonText,
+                  followingStatus[item.id] ? styles.followingButtonText : styles.followButtonText
+                ]}>
+                  {followingStatus[item.id] ? 'Following' : 'Follow back'}
+                </Text>
+              </TouchableOpacity>
             </TouchableOpacity>
-          </View>
-        )}
-        ItemSeparatorComponent={() => <View style={styles.separator} />}
-      />
+          )}
+          ItemSeparatorComponent={() => <View style={styles.separator} />}
+          ListEmptyComponent={() => (
+            <View style={styles.emptyContainer}>
+              <Text style={styles.emptyText}>No followers yet</Text>
+              <Text style={styles.emptySubtext}>Start studying and sharing to get followers!</Text>
+            </View>
+          )}
+        />
+      )}
     </View>
   );
 }
@@ -109,6 +230,47 @@ const styles = StyleSheet.create({
   },
   separator: {
     height: 12,
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  loadingText: {
+    marginTop: 10,
+    fontSize: 16,
+    color: '#666',
+  },
+  bio: {
+    fontSize: 12,
+    color: '#999',
+    marginTop: 2,
+  },
+  followingButton: {
+    backgroundColor: '#f0f0f0',
+    borderWidth: 1,
+    borderColor: '#ddd',
+  },
+  followingButtonText: {
+    color: '#666',
+  },
+  emptyContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingVertical: 50,
+  },
+  emptyText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: '#000',
+    marginBottom: 8,
+  },
+  emptySubtext: {
+    fontSize: 14,
+    color: '#666',
+    textAlign: 'center',
   },
 });
 

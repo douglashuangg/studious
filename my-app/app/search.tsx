@@ -2,9 +2,16 @@ import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput, A
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
+import { useFocusEffect } from '@react-navigation/native';
+import React from 'react';
 import { collection, query, where, getDocs, orderBy, limit, addDoc, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../firebase/firebaseInit";
 import { useAuth } from "../contexts/AuthContext";
+import { searchUsers, batchCheckFollowStatus } from "../firebase/followService";
+import { useFollowOperations } from "../hooks/useFollowOperations";
+import { navigateToExternalProfile } from "../utils/navigationUtils";
+import { ErrorBoundary } from "../components/ErrorBoundary";
+import { VirtualizedUserList } from "../components/VirtualizedUserList";
 
 export default function Search() {
   const router = useRouter();
@@ -13,63 +20,38 @@ export default function Search() {
   const [users, setUsers] = useState<any[]>([]);
   const [loading, setLoading] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+  
+  // Use the follow operations hook for race condition prevention
+  const { toggleFollow, isLoading: isFollowLoading } = useFollowOperations(currentUser?.uid);
 
-  // Search users in Firebase
-  const searchUsers = async (searchTerm: string) => {
+  // Search users using the follow service
+  const searchUsersInFirebase = async (searchTerm: string) => {
     if (!searchTerm.trim()) {
       setUsers([]);
       setHasSearched(false);
       return;
     }
 
+    if (!currentUser) return;
+
     try {
       setLoading(true);
       setHasSearched(true);
       
-      const usersRef = collection(db, 'users');
+      const searchResults = await searchUsers(searchTerm, currentUser.uid);
       
-      // Search by displayName (case insensitive)
-      const nameQuery = query(usersRef,
-        where('displayName', '>=', searchTerm),
-        where('displayName', '<=', searchTerm + '\uf8ff'),
-        orderBy('displayName'),
-        limit(20)
-      );
-
-      const nameSnapshot = await getDocs(nameQuery);
-      const nameResults = nameSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        avatar: doc.data().avatar || `https://via.placeholder.com/60x60/2D5A27/FFFFFF?text=${doc.data().displayName?.charAt(0) || 'U'}`,
-        isFollowing: false // Will be updated based on follow status
-      }));
-
-      // Search by email (for username-like searches)
-      const emailQuery = query(usersRef,
-        where('email', '>=', searchTerm),
-        where('email', '<=', searchTerm + '\uf8ff'),
-        orderBy('email'),
-        limit(20)
-      );
-
-      const emailSnapshot = await getDocs(emailQuery);
-      const emailResults = emailSnapshot.docs.map(doc => ({
-        id: doc.id,
-        ...doc.data(),
-        avatar: doc.data().avatar || `https://via.placeholder.com/60x60/2D5A27/FFFFFF?text=${doc.data().displayName?.charAt(0) || 'U'}`,
-        isFollowing: false
-      }));
-
-      // Combine and deduplicate results
-      const allResults = [...nameResults, ...emailResults];
-      const uniqueResults = allResults.filter((user, index, self) => 
-        index === self.findIndex(u => u.id === user.id)
-      );
-
-      // Filter out current user
-      const filteredResults = uniqueResults.filter(user => user.id !== currentUser?.uid);
+      // Batch check follow status for better performance
+      const userIds = searchResults.map(user => user.id);
+      const followStatusMap = await batchCheckFollowStatus(currentUser.uid, userIds);
       
-      setUsers(filteredResults);
+      // Add follow status and avatar to users
+      const usersWithFollowStatus = searchResults.map(user => ({
+        ...user,
+        avatar: user.profilePicture || `https://via.placeholder.com/60x60/2D5A27/FFFFFF?text=${user.displayName?.charAt(0) || 'U'}`,
+        isFollowing: followStatusMap[user.id] || false
+      }));
+      
+      setUsers(usersWithFollowStatus);
     } catch (error) {
       console.error('Error searching users:', error);
       Alert.alert("Error", "Failed to search users. Please try again.");
@@ -82,22 +64,47 @@ export default function Search() {
   // Handle search input with debouncing
   useEffect(() => {
     const timeoutId = setTimeout(() => {
-      searchUsers(searchQuery);
+      searchUsersInFirebase(searchQuery);
     }, 500); // 500ms debounce
 
     return () => clearTimeout(timeoutId);
   }, [searchQuery]);
 
-  const handleFollow = (userId: string) => {
+  const handleFollow = async (userId: string) => {
+    if (!currentUser) return;
+    
+    const userToUpdate = users.find(user => user.id === userId);
+    if (!userToUpdate) return;
+    
+    // Update UI immediately for optimistic update
     setUsers(users.map(user => 
       user.id === userId 
         ? { ...user, isFollowing: !user.isFollowing }
         : user
     ));
+    
+    // Use the hook for race condition prevention
+    await toggleFollow(
+      userId,
+      userToUpdate.isFollowing,
+      () => {
+        // Success callback - UI already updated
+        console.log('Follow operation successful');
+      },
+      (error) => {
+        // Error callback - revert UI state
+        setUsers(users.map(user => 
+          user.id === userId 
+            ? { ...user, isFollowing: userToUpdate.isFollowing }
+            : user
+        ));
+        Alert.alert("Error", error || "Failed to update follow status. Please try again.");
+      }
+    );
   };
 
   const handleUserPress = (userId: string) => {
-    router.push(`/user-profile/external-user-profile?id=${userId}`);
+    navigateToExternalProfile(userId, 'search');
   };
 
   const handleBack = () => {
@@ -107,8 +114,37 @@ export default function Search() {
     router.back();
   };
 
+  // Refresh follow status for all users when page comes into focus
+  const refreshFollowStatus = async () => {
+    if (!currentUser || users.length === 0) return;
+    
+    try {
+      // Use batch checking for better performance
+      const userIds = users.map(user => user.id);
+      const followStatusMap = await batchCheckFollowStatus(currentUser.uid, userIds);
+      
+      const updatedUsers = users.map(user => ({
+        ...user,
+        isFollowing: followStatusMap[user.id] || false
+      }));
+      setUsers(updatedUsers);
+    } catch (error) {
+      console.error('Error refreshing follow status:', error);
+    }
+  };
+
+  // Refresh follow status when page comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      if (users.length > 0) {
+        refreshFollowStatus();
+      }
+    }, [users.length])
+  );
+
   return (
-    <View style={styles.container}>
+    <ErrorBoundary>
+      <View style={styles.container}>
       <View style={styles.header}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
           <Ionicons name="chevron-back" size={24} color="#2D5A27" />
@@ -136,45 +172,17 @@ export default function Search() {
           <Text style={styles.loadingText}>Searching users...</Text>
         </View>
       ) : (
-        <FlatList
-          data={users}
-          keyExtractor={(item) => item.id}
-          contentContainerStyle={styles.listContent}
-          renderItem={({ item }) => (
-            <TouchableOpacity 
-              style={styles.userItem} 
-              onPress={() => handleUserPress(item.id)}
-            >
-              <Image source={{ uri: item.avatar }} style={styles.avatar} />
-              <View style={styles.userInfo}>
-                <Text style={styles.userName}>{item.displayName || 'Anonymous User'}</Text>
-                <Text style={styles.userUsername}>@{item.username || item.email?.split('@')[0] || 'user'}</Text>
-              </View>
-              <TouchableOpacity
-                style={[styles.followButton, item.isFollowing && styles.followingButton]}
-                onPress={() => handleFollow(item.id)}
-              >
-                <Text style={[styles.followButtonText, item.isFollowing && styles.followingButtonText]}>
-                  {item.isFollowing ? "Following" : "Follow"}
-                </Text>
-              </TouchableOpacity>
-            </TouchableOpacity>
-          )}
-          ItemSeparatorComponent={() => <View style={styles.separator} />}
-          ListEmptyComponent={
-            <View style={styles.emptyContainer}>
-              <Ionicons name="search" size={48} color="#ccc" />
-              <Text style={styles.emptyText}>
-                {hasSearched ? "No users found" : "Search for users"}
-              </Text>
-              <Text style={styles.emptySubtext}>
-                {hasSearched ? "Try searching with different keywords" : "Enter a name or email to search"}
-              </Text>
-            </View>
-          }
+        <VirtualizedUserList
+          users={users}
+          onUserPress={handleUserPress}
+          onFollowToggle={handleFollow}
+          loading={loading}
+          emptyMessage={hasSearched ? "No users found" : "Search for users"}
+          emptySubmessage={hasSearched ? "Try searching with different keywords" : "Enter a name or email to search"}
         />
       )}
-    </View>
+      </View>
+    </ErrorBoundary>
   );
 }
 

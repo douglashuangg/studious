@@ -1,12 +1,14 @@
 import { Text, View, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useRouter, useLocalSearchParams } from "expo-router";
 import { useState, useEffect } from "react";
 import { getStudySessions } from "../firebase/studySessionService";
+import { navigateBack } from "../utils/navigationUtils";
 
 export default function Statistics() {
   const router = useRouter();
-  const [studySessions, setStudySessions] = useState([]);
+  const { returnTo } = useLocalSearchParams();
+  const [studySessions, setStudySessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState('all'); // 'day', 'week', 'month', 'all'
 
@@ -52,7 +54,7 @@ export default function Statistics() {
   // Calculate statistics from filtered data
   const getSubjectStats = () => {
     const filteredSessions = getFilteredSessions();
-    const subjectMap = {};
+    const subjectMap: { [key: string]: any } = {};
     
     filteredSessions.forEach(session => {
       const subject = session.subject || 'Unknown';
@@ -80,18 +82,18 @@ export default function Statistics() {
       subjectMap[subject].sessionCount++;
     });
     
-    return Object.values(subjectMap).sort((a, b) => b.totalTime - a.totalTime);
+    return Object.values(subjectMap).sort((a: any, b: any) => b.totalTime - a.totalTime);
   };
 
   const subjectStats = getSubjectStats();
-  const totalStudyTime = subjectStats.reduce((sum, subject) => sum + subject.totalTime, 0);
+  const totalStudyTime = subjectStats.reduce((sum: number, subject: any) => sum + subject.totalTime, 0);
   const filteredSessions = getFilteredSessions();
   const uniqueDays = new Set(filteredSessions.map(session => {
     const date = session.createdAt?.toDate ? session.createdAt.toDate() : new Date(session.createdAt);
     return date.toDateString();
   })).size;
 
-  const formatTime = (hours) => {
+  const formatTime = (hours: number) => {
     const wholeHours = Math.floor(hours);
     const minutes = Math.round((hours - wholeHours) * 60);
     return `${wholeHours}h ${minutes}m`;
@@ -104,7 +106,13 @@ export default function Statistics() {
         <View style={styles.header}>
           <TouchableOpacity 
             style={styles.backButton}
-            onPress={() => router.back()}
+            onPress={() => {
+              if (returnTo && typeof returnTo === 'string') {
+                navigateBack(returnTo);
+              } else {
+                router.back();
+              }
+            }}
           >
             <Ionicons name="arrow-back" size={24} color="#2D5A27" />
           </TouchableOpacity>
@@ -124,7 +132,13 @@ export default function Statistics() {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => {
+            if (returnTo && typeof returnTo === 'string') {
+              navigateBack(returnTo);
+            } else {
+              router.back();
+            }
+          }}
         >
           <Ionicons name="arrow-back" size={24} color="#2D5A27" />
         </TouchableOpacity>
@@ -181,8 +195,8 @@ export default function Statistics() {
         <Text style={styles.sectionTitle}>Subject Breakdown</Text>
         <View style={styles.subjectList}>
           {subjectStats.length > 0 ? (
-            subjectStats.map((subject, index) => {
-              const maxTime = Math.max(...subjectStats.map(s => s.totalTime));
+            subjectStats.map((subject: any, index: number) => {
+              const maxTime = Math.max(...subjectStats.map((s: any) => s.totalTime));
               const barWidth = maxTime > 0 ? (subject.totalTime / maxTime) * 100 : 0;
               
               return (
@@ -200,7 +214,7 @@ export default function Statistics() {
                         ]} 
                       />
                     </View>
-                    <Text style={styles.subjectTime}>{formatTime(subject.totalTime)}</Text>
+                    <Text style={styles.subjectTime}>{formatTime(subject.totalTime as number)}</Text>
                   </View>
                 </View>
               );

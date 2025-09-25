@@ -6,7 +6,9 @@ import { getStudySessions } from "../firebase/studySessionService";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/firebaseInit";
+import { getFollowCounts } from "../firebase/followService";
 import { useFocusEffect } from '@react-navigation/native';
+import { navigateToStatistics, navigateToFollowers, navigateToFollowing } from "../utils/navigationUtils";
 import React from 'react';
 
 export default function Profile() {
@@ -18,6 +20,7 @@ export default function Profile() {
   const [totalSessions, setTotalSessions] = useState(0);
   const [streakDays, setStreakDays] = useState(0);
   const [userProfile, setUserProfile] = useState<any>(null);
+  const [followCounts, setFollowCounts] = useState({ followerCount: 0, followingCount: 0 });
 
   useEffect(() => {
     const fetchData = async () => {
@@ -39,6 +42,10 @@ export default function Profile() {
           } else {
             console.log('📱 No user profile document found, user needs to create profile');
           }
+          
+          // Fetch follow counts
+          const counts = await getFollowCounts(user.uid);
+          setFollowCounts(counts);
         }
         
         setLoading(false);
@@ -63,6 +70,10 @@ export default function Profile() {
               console.log('🔄 Reloaded user profile data:', profileData);
               setUserProfile(profileData);
             }
+            
+            // Also refresh follow counts
+            const counts = await getFollowCounts(user.uid);
+            setFollowCounts(counts);
           } catch (error) {
             console.error('Error reloading profile data:', error);
           }
@@ -159,12 +170,12 @@ export default function Profile() {
           </View>
           
           <View style={styles.followContainer}>
-            <TouchableOpacity style={styles.followItem} onPress={() => router.push("/followers")}>
-              <Text style={styles.followNumber}>12</Text>
+            <TouchableOpacity style={styles.followItem} onPress={() => navigateToFollowers(user?.uid, 'profile')}>
+              <Text style={styles.followNumber}>{followCounts.followerCount}</Text>
               <Text style={styles.followLabel}>Followers</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.followItem} onPress={() => router.push("/following")}>
-              <Text style={styles.followNumber}>12</Text>
+            <TouchableOpacity style={styles.followItem} onPress={() => navigateToFollowing(user?.uid, 'profile')}>
+              <Text style={styles.followNumber}>{followCounts.followingCount}</Text>
               <Text style={styles.followLabel}>Following</Text>
             </TouchableOpacity>
           </View>
@@ -228,7 +239,7 @@ export default function Profile() {
       {/* Statistics Button */}
       <TouchableOpacity 
         style={styles.statisticsButton}
-        onPress={() => router.push("/statistics")}
+        onPress={() => navigateToStatistics('profile')}
       >
         <View style={styles.statisticsContent}>
           <View style={styles.statisticsLeft}>

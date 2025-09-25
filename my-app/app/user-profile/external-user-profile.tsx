@@ -2,12 +2,16 @@ import { Text, View, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIn
 import { Ionicons } from "@expo/vector-icons";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useState, useEffect } from "react";
+import { useFocusEffect } from '@react-navigation/native';
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../firebase/firebaseInit";
 import { useAuth } from "../../contexts/AuthContext";
+import { followUser, unfollowUser, isFollowing as checkIsFollowing, getFollowers, getFollowing } from "../../firebase/followService";
+import { navigateBack } from "../../utils/navigationUtils";
+import React from 'react';
 
 export default function ExternalUserProfile() {
-  const { id } = useLocalSearchParams();
+  const { id, returnTo, originalReturnTo } = useLocalSearchParams();
   const router = useRouter();
   const { user: currentUser, isNewUser } = useAuth();
   
@@ -85,10 +89,21 @@ export default function ExternalUserProfile() {
           streak
         });
 
-        // Get followers and following (simplified for now)
-        setFollowers([]);
-        setFollowing([]);
-        setIsFollowing(false);
+        // Get followers and following data
+        const [followersData, followingData] = await Promise.all([
+          getFollowers(id as string),
+          getFollowing(id as string)
+        ]);
+        setFollowers(followersData);
+        setFollowing(followingData);
+        
+        // Check if current user is following this user
+        if (currentUser && currentUser.uid !== id) {
+          const followStatus = await checkIsFollowing(currentUser.uid, id as string);
+          setIsFollowing(followStatus);
+        } else {
+          setIsFollowing(false);
+        }
 
       } catch (error) {
         console.error('Error loading user data:', error);
@@ -99,7 +114,7 @@ export default function ExternalUserProfile() {
     };
 
     loadUserData();
-  }, [id]);
+  }, [id, currentUser]);
 
   // Calculate study streak
   const calculateStreak = (sessions: any[]) => {
@@ -141,15 +156,44 @@ export default function ExternalUserProfile() {
       return;
     }
     
+    const previousState = isFollowing;
+    
     try {
-      // TODO: Implement actual follow/unfollow functionality
+      // Update UI immediately
       setIsFollowing(!isFollowing);
-      Alert.alert("Success", isFollowing ? "Unfollowed user" : "Following user");
+      
+      // Then handle Firebase operation
+      if (isFollowing) {
+        await unfollowUser(currentUser.uid, id as string);
+      } else {
+        await followUser(currentUser.uid, id as string);
+      }
     } catch (error) {
       console.error('Error following user:', error);
+      // Revert UI state on error
+      setIsFollowing(previousState);
       Alert.alert("Error", "Failed to follow user.");
     }
   };
+
+  // Refresh follow status when page comes into focus
+  const refreshFollowStatus = async () => {
+    if (!currentUser || !id || currentUser.uid === id) return;
+    
+    try {
+      const followStatus = await checkIsFollowing(currentUser.uid, id as string);
+      setIsFollowing(followStatus);
+    } catch (error) {
+      console.error('Error refreshing follow status:', error);
+    }
+  };
+
+  // Refresh follow status when page comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      refreshFollowStatus();
+    }, [currentUser, id])
+  );
 
   // Format time ago
   const getTimeAgo = (date: Date) => {
@@ -194,7 +238,15 @@ export default function ExternalUserProfile() {
       <View style={styles.header}>
         <TouchableOpacity 
           style={styles.backButton}
-          onPress={() => router.back()}
+          onPress={() => {
+            if (returnTo && typeof returnTo === 'string') {
+              navigateBack(returnTo, id as string);
+            } else if (originalReturnTo && typeof originalReturnTo === 'string') {
+              navigateBack(originalReturnTo, id as string);
+            } else {
+              router.back();
+            }
+          }}
         >
           <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
@@ -228,14 +280,26 @@ export default function ExternalUserProfile() {
 
       {/* Followers/Following */}
       <View style={styles.followContainer}>
-        <View style={styles.followItem}>
+        <TouchableOpacity 
+          style={styles.followItem}
+          onPress={() => router.push({
+            pathname: '/followers',
+            params: { userId: id, returnTo: 'external-profile', originalReturnTo: returnTo }
+          })}
+        >
           <Text style={styles.followNumber}>{followers.length}</Text>
           <Text style={styles.followLabel}>Followers</Text>
-        </View>
-        <View style={styles.followItem}>
+        </TouchableOpacity>
+        <TouchableOpacity 
+          style={styles.followItem}
+          onPress={() => router.push({
+            pathname: '/following',
+            params: { userId: id, returnTo: 'external-profile', originalReturnTo: returnTo }
+          })}
+        >
           <Text style={styles.followNumber}>{following.length}</Text>
           <Text style={styles.followLabel}>Following</Text>
-        </View>
+        </TouchableOpacity>
       </View>
 
       {/* Follow Button - Only show if not current user */}
