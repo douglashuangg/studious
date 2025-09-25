@@ -113,6 +113,12 @@ export default function Profile() {
   const formatTime = (hours: number) => {
     const wholeHours = Math.floor(hours);
     const minutes = Math.round((hours - wholeHours) * 60);
+    
+    // If 0 hours, just show minutes
+    if (wholeHours === 0) {
+      return `${minutes}m`;
+    }
+    
     return `${wholeHours}h ${minutes}m`;
   };
 
@@ -156,9 +162,9 @@ export default function Profile() {
   };
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Beta Header */}
+      {/* Alpha Header */}
       <View style={styles.betaContainer}>
-        <Text style={styles.betaText}>BETA</Text>
+        <Text style={styles.betaText}>ALPHA v0.1.0</Text>
       </View>
 
       {/* Header with Profile Picture and Followers/Following */}
@@ -189,14 +195,21 @@ export default function Profile() {
         <Text style={styles.name}>
           {userProfile?.displayName || user?.displayName || 'User'}
         </Text>
-        <Text style={styles.username}>
-          @{userProfile?.username || user?.email?.split('@')[0] || 'user'}
-        </Text>
         {userProfile?.bio && (
           <Text style={styles.bio}>
             {userProfile.bio}
           </Text>
         )}
+      </View>
+
+      {/* Action Buttons */}
+      <View style={styles.actionsContainer}>
+        <TouchableOpacity 
+          style={styles.editProfileButton}
+          onPress={() => router.push("/edit-profile")}
+        >
+          <Text style={styles.editProfileText}>Edit Profile</Text>
+        </TouchableOpacity>
       </View>
 
       {/* Stats Row */}
@@ -223,19 +236,6 @@ export default function Profile() {
         </View>
       </View>
 
-      {/* Action Buttons */}
-      <View style={styles.actionsContainer}>
-        <TouchableOpacity 
-          style={styles.editProfileButton}
-          onPress={() => router.push("/edit-profile")}
-        >
-          <Text style={styles.editProfileText}>Edit Profile</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.settingsButton} onPress={handleLogout}>
-          <Ionicons name="log-out" size={24} color="#2D5A27" />
-        </TouchableOpacity>
-      </View>
-
       {/* Statistics Button */}
       <TouchableOpacity 
         style={styles.statisticsButton}
@@ -243,7 +243,7 @@ export default function Profile() {
       >
         <View style={styles.statisticsContent}>
           <View style={styles.statisticsLeft}>
-            <Ionicons name="analytics" size={24} color="#2D5A27" />
+            <Ionicons name="analytics" size={24} color="#FF3B30" />
             <View style={styles.statisticsText}>
               <Text style={styles.statisticsTitle}>Statistics</Text>
               <Text style={styles.statisticsSubtitle}>View detailed study analytics</Text>
@@ -259,7 +259,7 @@ export default function Profile() {
         {loading ? (
           <View style={styles.activityItem}>
             <View style={styles.activityIcon}>
-              <Ionicons name="calendar" size={20} color="#2D5A27" />
+              <Ionicons name="calendar" size={20} color="#34C759" />
             </View>
             <View style={styles.activityContent}>
               <Text style={styles.activityText}>Loading recent activity...</Text>
@@ -283,7 +283,7 @@ export default function Profile() {
             return (
               <View key={session.id} style={styles.activityItem}>
                 <View style={styles.activityIcon}>
-                  <Ionicons name="book" size={20} color="#2D5A27" />
+                  <Ionicons name="book" size={20} color="#2563EB" />
                 </View>
                 <View style={styles.activityContent}>
                   <Text style={styles.activityText}>
@@ -297,7 +297,7 @@ export default function Profile() {
         ) : (
           <View style={styles.activityItem}>
             <View style={styles.activityIcon}>
-              <Ionicons name="calendar" size={20} color="#2D5A27" />
+              <Ionicons name="calendar" size={20} color="#34C759" />
             </View>
             <View style={styles.activityContent}>
               <Text style={styles.activityText}>No study sessions yet</Text>
@@ -319,7 +319,7 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingVertical: 20,
     paddingHorizontal: 20,
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f8f9fa",
   },
   profilePictureContainer: {
     position: "relative",
@@ -330,7 +330,7 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     borderWidth: 3,
-    borderColor: "#2D5A27",
+    borderColor: "#000000",
   },
   editButton: {
     position: "absolute",
@@ -343,13 +343,14 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     alignItems: "center",
     borderWidth: 2,
-    borderColor: "#2D5A27",
+    borderColor: "#000000",
   },
   name: {
     fontSize: 24,
     fontWeight: "bold",
     color: "#000",
     marginBottom: 4,
+    fontFamily: "System",
   },
   username: {
     fontSize: 14,
@@ -364,10 +365,11 @@ const styles = StyleSheet.create({
   },
   statsContainer: {
     flexDirection: "row",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f8f9fa",
     marginHorizontal: 20,
     marginTop: 20,
-    borderRadius: 12,
+    marginBottom: 5,
+    borderRadius: 16,
     paddingVertical: 20,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -382,7 +384,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#2D5A27",
+    color: "#000000",
     marginBottom: 5,
   },
   statLabel: {
@@ -401,9 +403,9 @@ const styles = StyleSheet.create({
   },
   followContainer: {
     flexDirection: "row",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f8f9fa",
     marginLeft: 20,
-    borderRadius: 12,
+    borderRadius: 16,
     paddingVertical: 20,
     paddingHorizontal: 20,
     shadowColor: "#000",
@@ -430,37 +432,39 @@ const styles = StyleSheet.create({
   actionsContainer: {
     flexDirection: "row",
     marginHorizontal: 20,
-    marginTop: 20,
+    marginTop: 10,
     gap: 12,
   },
   editProfileButton: {
-    flex: 1,
-    backgroundColor: "#2D5A27",
-    paddingVertical: 12,
+    alignSelf: "center",
+    backgroundColor: "#000000",
+    paddingVertical: 8,
+    paddingHorizontal: 24,
     borderRadius: 8,
     alignItems: "center",
+    justifyContent: "center",
   },
   editProfileText: {
     color: "#ffffff",
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: "600",
   },
   settingsButton: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f8f9fa",
     paddingVertical: 12,
     paddingHorizontal: 16,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#2D5A27",
+    borderColor: "#000000",
     justifyContent: "center",
     alignItems: "center",
   },
   statisticsButton: {
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f8f9fa",
     marginHorizontal: 20,
-    marginTop: 30,
+    marginTop: 5,
     marginBottom: 20,
-    borderRadius: 12,
+    borderRadius: 16,
     padding: 16,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
@@ -494,7 +498,7 @@ const styles = StyleSheet.create({
   },
   activityContainer: {
     marginHorizontal: 20,
-    marginTop: 20,
+    marginTop: 10,
     marginBottom: 30,
   },
   sectionTitle: {
@@ -505,9 +509,9 @@ const styles = StyleSheet.create({
   },
   activityItem: {
     flexDirection: "row",
-    backgroundColor: "#ffffff",
+    backgroundColor: "#f8f9fa",
     padding: 15,
-    borderRadius: 8,
+    borderRadius: 12,
     marginBottom: 10,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },

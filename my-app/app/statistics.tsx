@@ -10,7 +10,7 @@ export default function Statistics() {
   const { returnTo } = useLocalSearchParams();
   const [studySessions, setStudySessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
-  const [timeFilter, setTimeFilter] = useState('all'); // 'day', 'week', 'month', 'all'
+  const [timeFilter, setTimeFilter] = useState('day'); // 'day', 'week', 'month', 'all'
 
   useEffect(() => {
     const fetchStudySessions = async () => {
@@ -114,7 +114,7 @@ export default function Statistics() {
               }
             }}
           >
-            <Ionicons name="arrow-back" size={24} color="#2D5A27" />
+            <Ionicons name="arrow-back" size={24} color="#000" />
           </TouchableOpacity>
           <Text style={styles.headerTitle}>Statistics</Text>
           <View style={styles.placeholder} />
@@ -140,7 +140,7 @@ export default function Statistics() {
             }
           }}
         >
-          <Ionicons name="arrow-back" size={24} color="#2D5A27" />
+          <Ionicons name="arrow-back" size={24} color="#000" />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>Statistics</Text>
         <View style={styles.placeholder} />
@@ -178,12 +178,12 @@ export default function Statistics() {
       {/* Overview Cards */}
       <View style={styles.overviewContainer}>
         <View style={styles.overviewCard}>
-          <Ionicons name="time" size={32} color="#2D5A27" />
+          <Ionicons name="time" size={32} color="#E8A87C" />
           <Text style={styles.overviewValue}>{formatTime(totalStudyTime)}</Text>
           <Text style={styles.overviewLabel}>Total Study Time</Text>
         </View>
         <View style={styles.overviewCard}>
-          <Ionicons name="calendar" size={32} color="#2D5A27" />
+          <Ionicons name="calendar" size={32} color="#E8A87C" />
           <Text style={styles.overviewValue}>{uniqueDays}</Text>
           <Text style={styles.overviewLabel}>Active Days</Text>
         </View>
@@ -241,6 +241,7 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     paddingHorizontal: 20,
     paddingVertical: 15,
+    paddingTop: 50,
     backgroundColor: "#ffffff",
     borderBottomWidth: 1,
     borderBottomColor: "#E5E5EA",
@@ -278,7 +279,7 @@ const styles = StyleSheet.create({
   overviewValue: {
     fontSize: 22,
     fontWeight: "bold",
-    color: "#2D5A27",
+    color: "#000",
     marginTop: 8,
     marginBottom: 4,
   },
@@ -337,7 +338,7 @@ const styles = StyleSheet.create({
   subjectTime: {
     fontSize: 14,
     fontWeight: "600",
-    color: "#2D5A27",
+    color: "#000",
     minWidth: 60,
     textAlign: "right",
   },
@@ -377,25 +378,28 @@ const styles = StyleSheet.create({
   },
   filterButton: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 16,
+    paddingVertical: 8,
+    paddingHorizontal: 12,
     backgroundColor: "transparent",
-    borderRadius: 8,
+    borderRadius: 6,
     alignItems: "center",
     justifyContent: "center",
+    minHeight: 36,
   },
   filterButtonActive: {
-    backgroundColor: "#2D5A27",
-    shadowColor: "#2D5A27",
+    backgroundColor: "#000",
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
     elevation: 3,
   },
   filterButtonText: {
-    fontSize: 14,
+    fontSize: 13,
     fontWeight: "600",
     color: "#666",
+    textAlign: "center",
+    lineHeight: 16,
   },
   filterButtonTextActive: {
     color: "#ffffff",

@@ -104,6 +104,7 @@ export default function RootLayout() {
         name="statistics"
         options={{
           href: null, // Hide from tab bar
+          headerShown: false, // Hide the top header
         }}
       />
       <Tabs.Screen

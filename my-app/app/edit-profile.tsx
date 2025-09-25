@@ -13,6 +13,7 @@ export default function EditProfile() {
   // Form state
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
+  const [username, setUsername] = useState("");
   const [school, setSchool] = useState("");
   const [bio, setBio] = useState("");
   const [loading, setLoading] = useState(false);
@@ -31,12 +32,14 @@ export default function EditProfile() {
           const userData = userDoc.data();
           setFirstName(userData.firstName || "");
           setLastName(userData.lastName || "");
+          setUsername(userData.username || user.email?.split('@')[0] || "");
           setSchool(userData.school || "");
           setBio(userData.bio || "");
         } else {
           // If no user document exists, create one with basic info
           setFirstName(user.displayName?.split(' ')[0] || "");
           setLastName(user.displayName?.split(' ').slice(1).join(' ') || "");
+          setUsername(user.email?.split('@')[0] || "");
         }
       } catch (error) {
         console.error('Error loading user data:', error);
@@ -60,12 +63,18 @@ export default function EditProfile() {
       return;
     }
 
+    if (!username.trim()) {
+      Alert.alert("Required Fields", "Username is required.");
+      return;
+    }
+
     try {
       setSaving(true);
       
       const userData = {
         firstName: firstName.trim(),
         lastName: lastName.trim(),
+        username: username.trim(),
         school: school.trim(),
         bio: bio.trim(),
         displayName: `${firstName.trim()} ${lastName.trim()}`,
@@ -111,6 +120,17 @@ export default function EditProfile() {
       [
         { text: "Keep Editing", style: "cancel" },
         { text: "Discard", style: "destructive", onPress: () => router.push("/profile") }
+      ]
+    );
+  };
+
+  const handleLogout = () => {
+    Alert.alert(
+      "Log Out",
+      "Are you sure you want to log out?",
+      [
+        { text: "Cancel", style: "cancel" },
+        { text: "Log Out", style: "destructive", onPress: () => logout() }
       ]
     );
   };
@@ -192,6 +212,22 @@ export default function EditProfile() {
           />
         </View>
 
+        {/* Username */}
+        <View style={styles.fieldContainer}>
+          <Text style={styles.fieldLabel}>Username *</Text>
+          <TextInput
+            style={styles.textInput}
+            value={username}
+            onChangeText={setUsername}
+            placeholder="Enter your username"
+            placeholderTextColor="#999"
+            maxLength={30}
+            autoCapitalize="none"
+            autoCorrect={false}
+          />
+          <Text style={styles.fieldHint}>This will be your unique identifier (e.g., @{username || 'username'})</Text>
+        </View>
+
         {/* School */}
         <View style={styles.fieldContainer}>
           <Text style={styles.fieldLabel}>School</Text>
@@ -261,6 +297,16 @@ export default function EditProfile() {
           ) : (
             <Text style={styles.saveButtonLargeText}>Save Changes</Text>
           )}
+        </TouchableOpacity>
+      </View>
+
+      {/* Logout Button */}
+      <View style={styles.logoutContainer}>
+        <TouchableOpacity 
+          style={styles.logoutButton}
+          onPress={handleLogout}
+        >
+          <Text style={styles.logoutButtonText}>Log Out</Text>
         </TouchableOpacity>
       </View>
     </ScrollView>
@@ -406,6 +452,12 @@ const styles = StyleSheet.create({
     textAlign: "right",
     marginTop: 5,
   },
+  fieldHint: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 5,
+    fontStyle: "italic",
+  },
   accountInfoContainer: {
     marginTop: 20,
     paddingTop: 20,
@@ -464,6 +516,22 @@ const styles = StyleSheet.create({
     backgroundColor: "#999",
   },
   saveButtonLargeText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#FFFFFF",
+  },
+  logoutContainer: {
+    paddingHorizontal: 20,
+    paddingBottom: 30,
+  },
+  logoutButton: {
+    backgroundColor: "#FF3B30",
+    paddingVertical: 16,
+    borderRadius: 8,
+    alignItems: "center",
+    justifyContent: "center",
+  },
+  logoutButtonText: {
     fontSize: 16,
     fontWeight: "600",
     color: "#FFFFFF",

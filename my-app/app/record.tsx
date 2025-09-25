@@ -389,9 +389,9 @@ export default function Record() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Beta Header */}
+        {/* Alpha Header */}
         <View style={styles.betaContainer}>
-          <Text style={styles.betaText}>BETA</Text>
+          <Text style={styles.betaText}>ALPHA v0.1.0</Text>
         </View>
 
         {/* Modern Header with Gradient */}

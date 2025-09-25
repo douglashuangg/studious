@@ -331,10 +331,10 @@ export default function Index() {
         />
       }
     >
-      {/* Beta Badge */}
+      {/* Alpha Badge */}
       <View style={styles.betaContainer}>
         <View style={styles.betaBadge}>
-          <Text style={styles.betaText}>BETA</Text>
+          <Text style={styles.betaText}>ALPHA v0.1.0</Text>
         </View>
       </View>
 
