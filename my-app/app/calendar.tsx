@@ -545,6 +545,11 @@ export default function Calendar() {
 
   return (
     <View style={styles.container}>
+      {/* Beta Header */}
+      <View style={styles.betaContainer}>
+        <Text style={styles.betaText}>BETA</Text>
+      </View>
+
       {/* Calendar Header */}
       <View style={styles.calendarHeader}>
         <TouchableOpacity onPress={goToPreviousDay} style={styles.navButton}>
@@ -1477,5 +1482,17 @@ const styles = StyleSheet.create({
   sessionsScrollView: {
     maxHeight: 150, // Scrollable area within the fixed container
     paddingHorizontal: 12,
+  },
+  betaContainer: {
+    backgroundColor: "#007AFF",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+  betaText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    letterSpacing: 1,
   },
 });

@@ -11,8 +11,15 @@ import {
   restoreTimerState,
   calculateElapsedTime
 } from "../backgroundTimerService.js";
+import { useAuth } from "../contexts/AuthContext";
+import { 
+  setCurrentlyStudying, 
+  removeCurrentlyStudying 
+} from "../firebase/currentlyStudyingService.js";
 
 export default function Record() {
+  const { user } = useAuth();
+  
   // Recording states
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -179,6 +186,16 @@ export default function Record() {
         elapsedTime: 0,
         backgroundTimerEnabled: backgroundTimerStarted
       });
+
+      // Set user as currently studying
+      if (user) {
+        try {
+          await setCurrentlyStudying(user.uid, subject, startTime.getTime(), notes);
+          console.log('✅ Set as currently studying');
+        } catch (error) {
+          console.error('❌ Error setting currently studying status:', error);
+        }
+      }
     }
     setIsRecording(true);
     setIsPaused(false);
@@ -199,9 +216,27 @@ export default function Record() {
         elapsedTime: seconds
       });
     }
+
+    // Update currently studying status with pause state
+    if (user) {
+      try {
+        await setCurrentlyStudying(user.uid, subject, sessionStartTime.getTime(), notes, newPausedState, 0);
+        console.log(`✅ Updated currently studying: ${newPausedState ? 'paused' : 'resumed'}`);
+      } catch (error) {
+        console.error('❌ Error updating currently studying status:', error);
+      }
+    }
+
+    console.log(`Timer ${newPausedState ? 'paused' : 'resumed'} - still currently studying`);
   };
 
   const handleStop = () => {
+    // Quick fix for web - just stop the timer directly
+    if (Platform.OS === 'web') {
+      resetSession();
+      return;
+    }
+    
     Alert.alert(
       "Stop Recording",
       `Do you want to save this study session?\n\nDuration: ${formatTime(seconds)}\nSubject: ${subject || "No subject"}`,
@@ -253,6 +288,16 @@ export default function Record() {
   };
 
   const resetSession = async () => {
+    // Remove user from currently studying status
+    if (user) {
+      try {
+        await removeCurrentlyStudying(user.uid);
+        console.log('✅ Removed from currently studying');
+      } catch (error) {
+        console.error('❌ Error removing currently studying status:', error);
+      }
+    }
+
     setIsRecording(false);
     setIsPaused(false);
     setSeconds(0);
@@ -265,7 +310,7 @@ export default function Record() {
     await clearTimerState();
   };
 
-  // Background timer functionality
+  // Background timer functionality - only run once on mount
   useEffect(() => {
     const loadTimerFromStorage = async () => {
       const restoredState = await restoreTimerState();
@@ -280,6 +325,16 @@ export default function Record() {
         // Use the calculated elapsed time
         setSeconds(restoredState.elapsedTime || 0);
         
+        // Restore currently studying status
+        if (user && restoredState.subject) {
+          try {
+            await setCurrentlyStudying(user.uid, restoredState.subject, restoredState.startTime, restoredState.notes || '', restoredState.isPaused || false, 0);
+            console.log('✅ Restored currently studying status');
+          } catch (error) {
+            console.error('❌ Error restoring currently studying status:', error);
+          }
+        }
+        
         console.log("Timer state restored from background:", {
           isRecording: true,
           elapsed: restoredState.elapsedTime,
@@ -289,7 +344,7 @@ export default function Record() {
     };
 
     loadTimerFromStorage();
-  }, []);
+  }, []); // Only run once on mount, not when user changes
 
   // Handle app state changes (foreground/background)
   useEffect(() => {
@@ -334,6 +389,11 @@ export default function Record() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
+        {/* Beta Header */}
+        <View style={styles.betaContainer}>
+          <Text style={styles.betaText}>BETA</Text>
+        </View>
+
         {/* Modern Header with Gradient */}
         <View style={styles.header}>
           <View style={styles.headerContent}>
@@ -1161,5 +1221,17 @@ const styles = StyleSheet.create({
   },
   inputModalTagTextSelected: {
     color: "#FFFFFF",
+  },
+  betaContainer: {
+    backgroundColor: "#007AFF",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+  betaText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    letterSpacing: 1,
   },
 });

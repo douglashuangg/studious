@@ -156,6 +156,11 @@ export default function Profile() {
   };
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+      {/* Beta Header */}
+      <View style={styles.betaContainer}>
+        <Text style={styles.betaText}>BETA</Text>
+      </View>
+
       {/* Header with Profile Picture and Followers/Following */}
       <View style={styles.header}>
         <View style={styles.profileSection}>
@@ -531,5 +536,17 @@ const styles = StyleSheet.create({
   activityTime: {
     fontSize: 14,
     color: "#666",
+  },
+  betaContainer: {
+    backgroundColor: "#007AFF",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    alignItems: "center",
+  },
+  betaText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    letterSpacing: 1,
   },
 });

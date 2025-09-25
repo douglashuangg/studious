@@ -1,20 +1,32 @@
-import { Text, View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator } from "react-native";
+import { Text, View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
+import * as Haptics from "expo-haptics";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { db } from "../firebase/firebaseInit";
 import { useAuth } from "../contexts/AuthContext";
+import { useCurrentlyStudying } from "../hooks/useCurrentlyStudying";
+import { formatCurrentlyStudyingForHomePage } from "../utils/currentlyStudyingUtils";
 
 export default function Index() {
   const router = useRouter();
   const { user } = useAuth();
+  
+  // Get currently studying users from followers
+  const { currentlyStudyingUsers, loading: currentlyStudyingLoading, refresh: refreshCurrentlyStudying } = useCurrentlyStudying() as {
+    currentlyStudyingUsers: any[];
+    loading: boolean;
+    error: any;
+    refresh: () => Promise<void>;
+  };
   
   // State for real Firebase data
   const [todayHours, setTodayHours] = useState(0);
   const [streak, setStreak] = useState(0);
   const [totalHours, setTotalHours] = useState(0);
   const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Load user's study data from Firebase
   useEffect(() => {
@@ -36,7 +48,7 @@ export default function Index() {
         const sessions = sessionsSnapshot.docs.map(doc => ({
           id: doc.id,
           ...doc.data()
-        })).sort((a, b) => {
+        } as any)).sort((a: any, b: any) => {
           const dateA = a.startTime?.toDate ? a.startTime.toDate() : new Date(a.startTime);
           const dateB = b.startTime?.toDate ? b.startTime.toDate() : new Date(b.startTime);
           return dateB.getTime() - dateA.getTime(); // Sort by newest first
@@ -123,63 +135,23 @@ export default function Index() {
     return `${wholeHours}h ${minutes}m`;
   };
   
-  // Mock data for currently studying stories
-  const studyingStories = [
-    {
-      id: 1,
-      name: "Sarah",
-      avatar: "https://via.placeholder.com/60x60/FF6B6B/FFFFFF?text=S",
-      subject: "Math",
-      duration: "2h 15m",
-      isLive: true,
-      hasSeen: false,
-    },
-    {
-      id: 2,
-      name: "Mike",
-      avatar: "https://via.placeholder.com/60x60/4ECDC4/FFFFFF?text=M",
-      subject: "Code",
-      duration: "1h 30m",
-      isLive: true,
-      hasSeen: true,
-    },
-    {
-      id: 3,
-      name: "Emma",
-      avatar: "https://via.placeholder.com/60x60/45B7D1/FFFFFF?text=E",
-      subject: "Physics",
-      duration: "45m",
-      isLive: true,
-      hasSeen: false,
-    },
-    {
-      id: 4,
-      name: "Alex",
-      avatar: "https://via.placeholder.com/60x60/96CEB4/FFFFFF?text=A",
-      subject: "Chemistry",
-      duration: "3h 20m",
-      isLive: true,
-      hasSeen: true,
-    },
-    {
-      id: 5,
-      name: "Lisa",
-      avatar: "https://via.placeholder.com/60x60/FFEAA7/FFFFFF?text=L",
-      subject: "Biology",
-      duration: "1h 5m",
-      isLive: true,
-      hasSeen: false,
-    },
-    {
-      id: 6,
-      name: "Tom",
-      avatar: "https://via.placeholder.com/60x60/DDA0DD/FFFFFF?text=T",
-      subject: "History",
-      duration: "2h 45m",
-      isLive: true,
-      hasSeen: true,
-    },
-  ];
+  // Format currently studying users for display
+  const studyingStories = currentlyStudyingLoading 
+    ? [] // Show loading state
+    : currentlyStudyingUsers.length > 0 
+      ? formatCurrentlyStudyingForHomePage(currentlyStudyingUsers)
+      : [
+          // Show "zzz" when nobody is studying
+          {
+            id: 'zzz',
+            name: "zzz",
+            avatar: "https://via.placeholder.com/60x60/E5E5EA/999999?text=zzz",
+            subject: "Nobody studying",
+            duration: "😴",
+            isLive: false,
+            hasSeen: true,
+          }
+        ];
   
   // Mock data for daily study summaries
   const dailySummaries = [
@@ -250,18 +222,122 @@ export default function Index() {
     },
   ];
 
-  const handleLike = (activityId) => {
+  const handleLike = (activityId: string) => {
     // Handle like functionality
     console.log("Liked activity:", activityId);
   };
 
-  const handleComment = (activityId) => {
+  const handleComment = (activityId: string) => {
     // Handle comment functionality
     console.log("Comment on activity:", activityId);
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    
+    try {
+      // Refresh currently studying data
+      await refreshCurrentlyStudying();
+      
+      // Refresh user stats
+      const loadUserStats = async () => {
+        if (!user) {
+          setLoading(false);
+          return;
+        }
+
+        try {
+          setLoading(true);
+          
+          // Get all study sessions for the user
+          const sessionsQuery = query(
+            collection(db, 'studySessions'),
+            where('userId', '==', user.uid)
+          );
+          const sessionsSnapshot = await getDocs(sessionsQuery);
+          const sessions = sessionsSnapshot.docs.map(doc => ({
+            id: doc.id,
+            ...doc.data()
+          } as any)).sort((a: any, b: any) => {
+            const dateA = a.startTime?.toDate ? a.startTime.toDate() : new Date(a.startTime);
+            const dateB = b.startTime?.toDate ? b.startTime.toDate() : new Date(b.startTime);
+            return dateB.getTime() - dateA.getTime(); // Sort by newest first
+          });
+
+          // Calculate today's hours
+          const today = new Date();
+          today.setHours(0, 0, 0, 0);
+          const tomorrow = new Date(today);
+          tomorrow.setDate(tomorrow.getDate() + 1);
+
+          let todayTotalHours = 0;
+          let totalStudyHours = 0;
+
+          sessions.forEach((session: any) => {
+            let sessionDuration = 0;
+            if (session.startTime && session.endTime) {
+              const start = session.startTime?.toDate ? session.startTime.toDate() : new Date(session.startTime);
+              const end = session.endTime?.toDate ? session.endTime.toDate() : new Date(session.endTime);
+              const durationMs = end.getTime() - start.getTime();
+              sessionDuration = durationMs / (1000 * 60 * 60); // Convert to hours
+            } else if (session.duration) {
+              sessionDuration = session.duration / 3600; // Convert seconds to hours
+            }
+
+            totalStudyHours += sessionDuration;
+
+            // Check if session was today
+            const sessionDate = session.startTime?.toDate ? session.startTime.toDate() : new Date(session.startTime);
+            if (sessionDate >= today && sessionDate < tomorrow) {
+              todayTotalHours += sessionDuration;
+            }
+          });
+
+          // Calculate streak
+          const streak = calculateStreak(sessions);
+
+          setTodayHours(Math.round(todayTotalHours * 10) / 10);
+          setTotalHours(Math.round(totalStudyHours * 10) / 10);
+          setStreak(streak);
+
+        } catch (error) {
+          console.error('Error loading user stats:', error);
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      await loadUserStats();
+    } catch (error) {
+      console.error('Error refreshing data:', error);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <ScrollView 
+      style={styles.container} 
+      showsVerticalScrollIndicator={false}
+      refreshControl={
+        <RefreshControl
+          refreshing={refreshing}
+          onRefresh={onRefresh}
+          tintColor="#2D5A27"
+          colors={["#2D5A27", "#007AFF"]}
+          title="Pull to refresh"
+          titleColor="#666"
+          progressBackgroundColor="#ffffff"
+        />
+      }
+    >
+      {/* Beta Badge */}
+      <View style={styles.betaContainer}>
+        <View style={styles.betaBadge}>
+          <Text style={styles.betaText}>BETA</Text>
+        </View>
+      </View>
+
       {/* Stories Section */}
       <View style={styles.storiesContainer}>
         <Text style={styles.storiesTitle}>Currently Studying</Text>
@@ -270,34 +346,51 @@ export default function Index() {
           showsHorizontalScrollIndicator={false}
           contentContainerStyle={styles.storiesScrollContent}
         >
-          {studyingStories.map((story) => (
-            <TouchableOpacity 
-              key={story.id} 
-              style={styles.storyItem}
-              onPress={() => router.push(`/user-profile/external-user-profile?id=${story.id}`)}
-            >
-              <View style={[
-                styles.storyRing,
-                !story.hasSeen && styles.storyRingUnseen
-              ]}>
-                <Image source={{ uri: story.avatar }} style={styles.storyAvatar} />
-                {story.isLive && (
-                  <View style={styles.liveIndicator}>
-                    <View style={styles.liveDot} />
-                  </View>
-                )}
-              </View>
-              <Text style={styles.storyName} numberOfLines={1}>
-                {story.name}
-              </Text>
-              <Text style={styles.storySubject} numberOfLines={1}>
-                {story.subject}
-              </Text>
-              <Text style={styles.storyDuration}>
-                {story.duration}
-              </Text>
-            </TouchableOpacity>
-          ))}
+          {currentlyStudyingLoading ? (
+            <View style={styles.loadingContainer}>
+              <ActivityIndicator size="small" color="#2D5A27" />
+              <Text style={styles.loadingText}>Loading...</Text>
+            </View>
+          ) : studyingStories.length > 0 ? (
+            studyingStories.map((story) => (
+              <TouchableOpacity 
+                key={story.id} 
+                style={styles.storyItem}
+                onPress={() => {
+                  if (story.id !== 'zzz') {
+                    router.push(`/user-profile/external-user-profile?id=${story.id}`);
+                  }
+                }}
+                disabled={story.id === 'zzz'}
+              >
+                <View style={[
+                  styles.storyRing,
+                  !story.hasSeen && styles.storyRingUnseen,
+                  story.id === 'zzz' && styles.zzzRing
+                ]}>
+                  <Image source={{ uri: story.avatar }} style={styles.storyAvatar} />
+                  {story.isLive && (
+                    <View style={styles.liveIndicator}>
+                      <View style={styles.liveDot} />
+                    </View>
+                  )}
+                </View>
+                <Text style={[styles.storyName, story.id === 'zzz' && styles.zzzText]} numberOfLines={1}>
+                  {story.name}
+                </Text>
+                <Text style={[styles.storySubject, story.id === 'zzz' && styles.zzzText]} numberOfLines={1}>
+                  {story.subject}
+                </Text>
+                <Text style={[styles.storyDuration, story.id === 'zzz' && styles.zzzText]}>
+                  {story.duration}
+                </Text>
+              </TouchableOpacity>
+            ))
+          ) : (
+            <View style={styles.noDataContainer}>
+              <Text style={styles.noDataText}>No one is currently studying</Text>
+            </View>
+          )}
         </ScrollView>
       </View>
 
@@ -378,7 +471,7 @@ export default function Index() {
             <View style={styles.summaryActions}>
               <TouchableOpacity 
                 style={styles.actionButton}
-                onPress={() => handleLike(summary.id)}
+                onPress={() => handleLike(summary.id.toString())}
               >
                 <Ionicons 
                   name={summary.isLiked ? "heart" : "heart-outline"} 
@@ -392,7 +485,7 @@ export default function Index() {
               
               <TouchableOpacity 
                 style={styles.actionButton}
-                onPress={() => handleComment(summary.id)}
+                onPress={() => handleComment(summary.id.toString())}
               >
                 <Ionicons name="chatbubble-outline" size={20} color="#666" />
                 <Text style={styles.actionText}>Comment</Text>
@@ -723,5 +816,52 @@ const styles = StyleSheet.create({
   },
   likedText: {
     color: "#FF3B30",
+  },
+  loadingContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+    paddingHorizontal: 40,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 8,
+  },
+  zzzRing: {
+    backgroundColor: "#F0F0F0",
+    borderWidth: 1,
+    borderColor: "#E0E0E0",
+  },
+  zzzText: {
+    color: "#999",
+    fontStyle: "italic",
+  },
+  noDataContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+    paddingHorizontal: 40,
+  },
+  noDataText: {
+    fontSize: 14,
+    color: "#666",
+    fontStyle: "italic",
+  },
+  betaContainer: {
+    backgroundColor: "#007AFF",
+    paddingVertical: 8,
+    paddingHorizontal: 20,
+    marginTop: 10,
+    alignItems: "center",
+  },
+  betaBadge: {
+    // No additional styling needed - container handles it
+  },
+  betaText: {
+    fontSize: 12,
+    fontWeight: "bold",
+    color: "#FFFFFF",
+    letterSpacing: 1,
   },
 });
