@@ -440,6 +440,7 @@ export default function Calendar() {
   };
 
   const [studySessions, setStudySessions] = useState<any[]>([]);
+  const [isSessionsExpanded, setIsSessionsExpanded] = useState(true);
 
   // Load sessions from Firebase when component mounts or date changes
   useEffect(() => {
@@ -542,6 +543,7 @@ export default function Calendar() {
   };
 
   const isToday = selectedDate.toDateString() === new Date().toDateString();
+
 
   return (
     <View style={styles.container}>
@@ -737,7 +739,7 @@ export default function Calendar() {
                           right: 0,
                           top: topPosition,
                           height: Math.max(height, 4), // Minimum 4px height
-                          backgroundColor: '#34C759', // Green block
+                          backgroundColor: '#4A7C59', // Muted pastel green block
                           zIndex: 10,
                         }}
                       />
@@ -797,51 +799,50 @@ export default function Calendar() {
       </View>
 
       {/* Fixed Today's Sessions Section */}
-      <View style={styles.fixedSessionsContainer}>
+      <View style={[
+        styles.fixedSessionsContainer,
+        !isSessionsExpanded && styles.fixedSessionsContainerCollapsed
+      ]}>
+        {/* Toggle Handle */}
+        <TouchableOpacity 
+          onPress={() => setIsSessionsExpanded(!isSessionsExpanded)}
+          style={styles.dragHandle}
+        >
+          <View style={styles.dragBar} />
+        </TouchableOpacity>
 
         {/* Legend */}
         <View style={styles.legend}>
-        <View style={styles.legendHeader}>
-          <Text style={styles.legendTitle}>
-            {isToday ? "Today's Sessions" : `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Sessions`}
-          </Text>
-          <TouchableOpacity 
-            style={[
-              styles.recordButton,
-              isRecording && styles.recordingButton
-            ]}
-            onPress={() => setShowRecordModal(true)}
-          >
-            <Ionicons 
-              name={isRecording ? "stop" : "add"} 
-              size={20} 
-              color="white" 
-            />
-          </TouchableOpacity>
-        </View>
-        
-        <ScrollView 
-          style={styles.sessionsScrollView}
-          showsVerticalScrollIndicator={true}
-          nestedScrollEnabled={true}
-        >
-          {studySessions.length > 0 ? (
-            studySessions.map((session, index) => (
-              <View key={session.id || index} style={styles.legendItem}>
-                <View style={[styles.legendColor, { backgroundColor: session.color || "#2D5A27" }]} />
-                <View style={styles.legendContent}>
-                  <Text style={styles.legendText}>{session.subject}</Text>
-                  <Text style={styles.legendTime}>
-                    {session.startTime ? formatFirebaseTime(session.startTime) : formatFirebaseTime(session.createdAt)} - {session.endTime ? formatFirebaseTime(session.endTime) : formatFirebaseTime(session.updatedAt)}
-                  </Text>
-                </View>
-              </View>
-            ))
-          ) : (
-            <Text style={styles.noSessionsText}>No study sessions for this day</Text>
+          <View style={styles.legendHeader}>
+            <Text style={styles.legendTitle}>
+              {isToday ? "Today's Sessions" : `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Sessions`}
+            </Text>
+          </View>
+          
+          {isSessionsExpanded && (
+            <ScrollView 
+              style={styles.sessionsScrollView}
+              showsVerticalScrollIndicator={true}
+              nestedScrollEnabled={true}
+            >
+              {studySessions.length > 0 ? (
+                studySessions.map((session, index) => (
+                  <View key={session.id || index} style={styles.legendItem}>
+                    <View style={[styles.legendColor, { backgroundColor: session.color || "#4A7C59" }]} />
+                    <View style={styles.legendContent}>
+                      <Text style={styles.legendText}>{session.subject}</Text>
+                      <Text style={styles.legendTime}>
+                        {session.startTime ? formatFirebaseTime(session.startTime) : formatFirebaseTime(session.createdAt)} - {session.endTime ? formatFirebaseTime(session.endTime) : formatFirebaseTime(session.updatedAt)}
+                      </Text>
+                    </View>
+                  </View>
+                ))
+              ) : (
+                <Text style={styles.noSessionsText}>No study sessions for this day</Text>
+              )}
+            </ScrollView>
           )}
-        </ScrollView>
-      </View>
+        </View>
       </View>
 
       {/* Record Modal */}
@@ -868,13 +869,13 @@ export default function Calendar() {
             {/* Main Timer Card */}
             <View style={styles.timerCard}>
               <View style={styles.timerDisplay}>
-          <Text style={styles.timerText}>{formatTime(seconds)}</Text>
-          {isRecording && (
+                <Text style={styles.timerText}>{formatTime(seconds)}</Text>
+                {isRecording && (
                   <View style={styles.statusContainer}>
                     <View style={[styles.statusDot, isPaused && styles.pausedDot]} />
-            <Text style={styles.statusText}>
+                    <Text style={styles.statusText}>
                       {isPaused ? "Paused" : "Recording"}
-            </Text>
+                    </Text>
                     {!isPaused && (
                       <Text style={styles.backgroundIndicator}>
                         📱 Timer running
@@ -886,8 +887,8 @@ export default function Calendar() {
                       </Text>
                     )}
                   </View>
-          )}
-        </View>
+                )}
+              </View>
 
               {/* Subject Input */}
               <View style={styles.subjectSection}>
@@ -900,37 +901,37 @@ export default function Calendar() {
                   editable={!isRecording}
                   placeholderTextColor="#8E8E93"
                 />
-        </View>
+              </View>
 
-        {/* Control Buttons */}
+              {/* Control Buttons */}
               <View style={styles.controlsContainer}>
-          {!isRecording ? (
-            <TouchableOpacity
+                {!isRecording ? (
+                  <TouchableOpacity
                     style={[styles.primaryButton, !subject.trim() && styles.disabledButton]}
-              onPress={handleStart}
-              disabled={!subject.trim()}
-            >
+                    onPress={handleStart}
+                    disabled={!subject.trim()}
+                  >
                     <Ionicons name="play" size={28} color="white" />
-            </TouchableOpacity>
-          ) : (
+                  </TouchableOpacity>
+                ) : (
                   <View style={styles.recordingControls}>
-              <TouchableOpacity
+                    <TouchableOpacity
                       style={styles.secondaryButton}
-                onPress={handlePause}
-              >
+                      onPress={handlePause}
+                    >
                       <Ionicons name={isPaused ? "play" : "pause"} size={24} color="#2D5A27" />
-              </TouchableOpacity>
-              
-              <TouchableOpacity
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity
                       style={styles.stopButton}
-                onPress={handleStop}
-              >
-                <Ionicons name="stop" size={24} color="white" />
-              </TouchableOpacity>
+                      onPress={handleStop}
+                    >
+                      <Ionicons name="stop" size={24} color="white" />
+                    </TouchableOpacity>
+                  </View>
+                )}
+              </View>
             </View>
-          )}
-        </View>
-        </View>
 
             {/* Quick Subject Pills */}
             <View style={styles.pillsContainer}>
@@ -960,8 +961,8 @@ export default function Calendar() {
                 numberOfLines={3}
                 placeholderTextColor="#8E8E93"
               />
-      </View>
-    </ScrollView>
+            </View>
+          </ScrollView>
         </View>
       </Modal>
     </View>
@@ -972,7 +973,6 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
-    paddingBottom: 200, // Add padding for fixed sessions section
   },
   // Calendar styles
   calendarHeader: {
@@ -1111,34 +1111,20 @@ const styles = StyleSheet.create({
     opacity: 0.9,
   },
   legend: {
-    backgroundColor: "#ffffff",
     padding: 8,
-    borderTopWidth: 1,
-    borderTopColor: "#E5E5EA",
   },
   legendHeader: {
     flexDirection: "row",
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 8,
   },
   legendTitle: {
     fontSize: 18,
     fontWeight: "bold",
     color: "#000",
-  },
-  recordButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: "#2D5A27",
-    justifyContent: "center",
-    alignItems: "center",
-    shadowColor: "#2D5A27",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
   },
   legendItem: {
     flexDirection: "row",
@@ -1184,11 +1170,6 @@ const styles = StyleSheet.create({
     fontStyle: "italic",
     textAlign: "center",
     marginTop: 10,
-  },
-  recordingButton: {
-    backgroundColor: "#FF3B30", // Red color when recording
-    shadowColor: "#FF3B30",
-    transform: [{ scale: 1.1 }], // Slightly larger when recording
   },
   // Modal styles
   modalContainer: {
@@ -1269,7 +1250,7 @@ const styles = StyleSheet.create({
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: "#34C759",
+    backgroundColor: "#4A7C59",
     marginRight: 8,
   },
   pausedDot: {
@@ -1282,7 +1263,7 @@ const styles = StyleSheet.create({
   },
   backgroundIndicator: {
     fontSize: 12,
-    color: "#34C759",
+    color: "#4A7C59",
     fontWeight: "500",
     marginTop: 4,
     textAlign: "center",
@@ -1475,12 +1456,15 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     backgroundColor: "#FFFFFF",
-    borderTopWidth: 1,
-    borderTopColor: "#E5E5EA",
-    maxHeight: 200, // Fixed height for the sessions section
+    borderWidth: 1,
+    borderColor: "#D1D5DB",
+    borderBottomWidth: 0,
+    borderTopLeftRadius: 16,
+    borderTopRightRadius: 16,
+    maxHeight: 180, // Increased height to cover gray area
   },
   sessionsScrollView: {
-    maxHeight: 150, // Scrollable area within the fixed container
+    maxHeight: 140, // Increased scrollable area to match container
     paddingHorizontal: 12,
   },
   betaContainer: {
@@ -1494,5 +1478,19 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#FFFFFF",
     letterSpacing: 1,
+  },
+  dragHandle: {
+    alignItems: "center",
+    paddingVertical: 4,
+    paddingTop: 8,
+  },
+  dragBar: {
+    width: 40,
+    height: 4,
+    backgroundColor: "#D1D5DB",
+    borderRadius: 2,
+  },
+  fixedSessionsContainerCollapsed: {
+    maxHeight: 60, // Smaller height when collapsed
   },
 });

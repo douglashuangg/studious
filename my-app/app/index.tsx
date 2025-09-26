@@ -323,8 +323,8 @@ export default function Index() {
         <RefreshControl
           refreshing={refreshing}
           onRefresh={onRefresh}
-          tintColor="#2D5A27"
-          colors={["#2D5A27", "#007AFF"]}
+          tintColor="#4A7C59"
+          colors={["#4A7C59", "#007AFF"]}
           title="Pull to refresh"
           titleColor="#666"
           progressBackgroundColor="#ffffff"
@@ -348,7 +348,7 @@ export default function Index() {
         >
           {currentlyStudyingLoading ? (
             <View style={styles.loadingContainer}>
-              <ActivityIndicator size="small" color="#2D5A27" />
+              <ActivityIndicator size="small" color="#4A7C59" />
               <Text style={styles.loadingText}>Loading...</Text>
             </View>
           ) : studyingStories.length > 0 ? (
@@ -423,10 +423,10 @@ export default function Index() {
         <Text style={styles.feedTitle}>Daily Study Summaries</Text>
         <View style={styles.headerButtons}>
           <TouchableOpacity style={styles.searchButton} onPress={() => router.push("/search")}>
-            <Ionicons name="search" size={20} color="#2D5A27" />
+            <Ionicons name="search" size={20} color="#4A7C59" />
           </TouchableOpacity>
           <TouchableOpacity style={styles.refreshButton}>
-            <Ionicons name="refresh" size={20} color="#2D5A27" />
+            <Ionicons name="refresh" size={20} color="#4A7C59" />
           </TouchableOpacity>
         </View>
       </View>
@@ -550,7 +550,7 @@ const styles = StyleSheet.create({
     position: "relative",
   },
   storyRingUnseen: {
-    backgroundColor: "#2D5A27",
+    backgroundColor: "#4A7C59",
   },
   storyAvatar: {
     width: 60,
@@ -589,7 +589,7 @@ const styles = StyleSheet.create({
   },
   storyDuration: {
     fontSize: 9,
-    color: "#2D5A27",
+    color: "#4A7C59",
     fontWeight: "500",
     textAlign: "center",
   },
@@ -617,7 +617,7 @@ const styles = StyleSheet.create({
   statNumber: {
     fontSize: 20,
     fontWeight: "bold",
-    color: "#2D5A27",
+    color: "#4A7C59",
     marginBottom: 5,
   },
   statLabel: {
@@ -724,7 +724,7 @@ const styles = StyleSheet.create({
   },
   highlightText: {
     fontWeight: "600",
-    color: "#2D5A27",
+    color: "#4A7C59",
   },
   subjectsContainer: {
     marginTop: 8,
@@ -750,7 +750,7 @@ const styles = StyleSheet.create({
   },
   subjectTagText: {
     fontSize: 12,
-    color: "#2D5A27",
+    color: "#4A7C59",
     fontWeight: "500",
   },
   summaryActions: {
@@ -852,7 +852,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#007AFF",
     paddingVertical: 8,
     paddingHorizontal: 20,
-    marginTop: 10,
     alignItems: "center",
   },
   betaBadge: {

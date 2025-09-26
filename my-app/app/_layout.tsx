@@ -10,8 +10,8 @@ export default function RootLayout() {
       <AuthWrapper>
         <Tabs
       screenOptions={{
-        tabBarActiveTintColor: "#2D5A27",
-        tabBarInactiveTintColor: "#8B9A8B",
+        tabBarActiveTintColor: "#4A7C59",
+        tabBarInactiveTintColor: "#8E8E93",
         tabBarStyle: {
           backgroundColor: "#FFFFFF",
           borderTopWidth: 1,
@@ -124,7 +124,7 @@ export default function RootLayout() {
         }}
       />
     </Tabs>
-      </AuthWrapper>
-    </AuthProvider>
+        </AuthWrapper>
+      </AuthProvider>
   );
 }

@@ -175,9 +175,6 @@ export default function Profile() {
               source={{ uri: "https://via.placeholder.com/120x120/007AFF/FFFFFF?text=U" }}
               style={styles.profilePicture}
             />
-            <TouchableOpacity style={styles.editButton}>
-              <Ionicons name="camera" size={20} color="#007AFF" />
-            </TouchableOpacity>
           </View>
           
           <View style={styles.followContainer}>
@@ -330,19 +327,6 @@ const styles = StyleSheet.create({
     height: 80,
     borderRadius: 40,
     borderWidth: 3,
-    borderColor: "#000000",
-  },
-  editButton: {
-    position: "absolute",
-    bottom: 0,
-    right: 0,
-    backgroundColor: "#ffffff",
-    borderRadius: 15,
-    width: 30,
-    height: 30,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 2,
     borderColor: "#000000",
   },
   name: {
