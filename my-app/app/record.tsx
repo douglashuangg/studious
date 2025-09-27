@@ -383,7 +383,6 @@ export default function Record() {
       >
         <PageHeader 
           title="Focus Timer"
-          left={<TouchableOpacity onPress={() => {}} style={{ padding: 8 }}><Ionicons name="chevron-back" size={24} color="#000" /></TouchableOpacity>}
           right={<View style={{ width: 24 }} />}
         />
 

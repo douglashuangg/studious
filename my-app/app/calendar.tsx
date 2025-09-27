@@ -360,7 +360,6 @@ export default function Calendar() {
     <View style={styles.container}>
       <PageHeader 
         title="Study Calendar"
-        left={<TouchableOpacity onPress={() => {}} style={{ padding: 8 }}><Ionicons name="chevron-back" size={24} color="#000" /></TouchableOpacity>}
         right={<View style={{ width: 24 }} />}
       />
 

@@ -101,9 +101,8 @@ export default function EditProfile() {
         await setDoc(userDocRef, userData);
       }
       
-      Alert.alert("Success", "Profile saved successfully!", [
-        { text: "OK", onPress: () => router.push("/profile") }
-      ]);
+      // Navigate back to profile page after successful save
+      router.push("/profile");
       
     } catch (error) {
       console.error('❌ Error saving profile:', error);
@@ -113,20 +112,6 @@ export default function EditProfile() {
     }
   };
 
-  const handleBack = () => {
-    router.push("/profile");
-  };
-
-  const handleCancel = () => {
-    Alert.alert(
-      "Discard Changes",
-      "Are you sure you want to discard your changes?",
-      [
-        { text: "Keep Editing", style: "cancel" },
-        { text: "Discard", style: "destructive", onPress: () => router.push("/profile") }
-      ]
-    );
-  };
 
   const handleImagePicker = () => {
     Alert.alert(
@@ -225,7 +210,7 @@ export default function EditProfile() {
       <PageHeader
         title="Edit Profile"
         left={
-          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+          <TouchableOpacity style={styles.backButton} onPress={() => router.push("/profile")}>
             <Ionicons name="arrow-back" size={24} color="#000" />
           </TouchableOpacity>
         }
@@ -370,27 +355,6 @@ export default function EditProfile() {
         </View>
       </View>
 
-      {/* Action Buttons */}
-      <View style={styles.actionContainer}>
-        <TouchableOpacity 
-          style={styles.cancelButton}
-          onPress={handleCancel}
-        >
-          <Text style={styles.cancelButtonText}>Cancel</Text>
-        </TouchableOpacity>
-        
-        <TouchableOpacity 
-          style={[styles.saveButtonLarge, saving && styles.saveButtonDisabled]}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color="#FFFFFF" />
-          ) : (
-            <Text style={styles.saveButtonLargeText}>Save Changes</Text>
-          )}
-        </TouchableOpacity>
-      </View>
 
       {/* Logout Button */}
       <View style={styles.logoutContainer}>
@@ -581,47 +545,14 @@ const styles = StyleSheet.create({
     color: "#000",
     fontWeight: "500",
   },
-  actionContainer: {
-    flexDirection: "row",
-    paddingHorizontal: 20,
-    paddingBottom: 30,
-    gap: 12,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: 16,
-    borderRadius: 8,
-    borderWidth: 1,
-    borderColor: "#E5E5EA",
-    alignItems: "center",
-    backgroundColor: "#FFFFFF",
-  },
-  cancelButtonText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#666",
-  },
-  saveButtonLarge: {
-    flex: 2,
-    paddingVertical: 16,
-    borderRadius: 8,
-    alignItems: "center",
-    backgroundColor: "#2D5A27",
-  },
-  saveButtonDisabled: {
-    backgroundColor: "#999",
-  },
-  saveButtonLargeText: {
-    fontSize: 16,
-    fontWeight: "600",
-    color: "#FFFFFF",
-  },
   logoutContainer: {
     paddingHorizontal: 20,
     paddingBottom: 30,
   },
   logoutButton: {
-    backgroundColor: "#FF3B30",
+    backgroundColor: "transparent",
+    borderWidth: 1,
+    borderColor: "#E5E5EA",
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: "center",
@@ -630,6 +561,6 @@ const styles = StyleSheet.create({
   logoutButtonText: {
     fontSize: 16,
     fontWeight: "600",
-    color: "#FFFFFF",
+    color: "#666",
   },
 });
