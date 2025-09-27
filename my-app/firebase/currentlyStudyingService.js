@@ -227,7 +227,7 @@ export const getCurrentlyStudyingFromFollowing = async (currentUserId, following
               id: userId,
               displayName: userData.displayName || 'Unknown User',
               username: userData.username || userData.email?.split('@')[0] || 'user',
-              profilePicture: userData.profilePicture || null,
+              profilePicture: userData.profilePictureUrl || null,
               bio: userData.bio || ''
             }
           };
@@ -297,7 +297,7 @@ export const subscribeToCurrentlyStudying = (currentUserId, followingUserIds, ca
             userDataMap.set(userIds[index], {
               displayName: userData.displayName || 'Unknown User',
               username: userData.username || userData.email?.split('@')[0] || 'user',
-              profilePicture: userData.profilePicture || null,
+              profilePicture: userData.profilePictureUrl || null,
               bio: userData.bio || ''
             });
           }

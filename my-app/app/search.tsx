@@ -44,10 +44,9 @@ export default function Search() {
       const userIds = searchResults.map(user => user.id);
       const followStatusMap = await batchCheckFollowStatus(currentUser.uid, userIds);
       
-      // Add follow status and avatar to users
+      // Add follow status to users
       const usersWithFollowStatus = searchResults.map(user => ({
         ...user,
-        avatar: user.profilePicture || `https://via.placeholder.com/60x60/2D5A27/FFFFFF?text=${user.displayName?.charAt(0) || 'U'}`,
         isFollowing: followStatusMap[user.id] || false
       }));
       

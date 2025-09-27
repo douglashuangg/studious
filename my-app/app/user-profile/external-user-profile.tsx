@@ -268,7 +268,15 @@ export default function ExternalUserProfile() {
 
       {/* Profile Picture and Info */}
       <View style={styles.profileSection}>
-        <Image source={{ uri: user.avatar }} style={styles.profilePicture} />
+        {user.profilePictureUrl ? (
+          <Image source={{ uri: user.profilePictureUrl }} style={styles.profilePicture} />
+        ) : (
+          <View style={styles.profilePicture}>
+            <Text style={styles.profilePictureText}>
+              {user.displayName?.split(' ').map(name => name.charAt(0)).join('').toUpperCase() || 'U'}
+            </Text>
+          </View>
+        )}
         <Text style={styles.name}>{user.displayName || 'Anonymous User'}</Text>
         <Text style={styles.username}>@{user.username || user.email?.split('@')[0] || 'user'}</Text>
         <Text style={styles.bio}>{user.bio || 'No bio available'}</Text>
@@ -410,8 +418,15 @@ const styles = StyleSheet.create({
     height: 100,
     borderRadius: 50,
     borderWidth: 3,
-    borderColor: "#2D5A27",
+    borderColor: "#E5E5EA",
     marginBottom: 15,
+    backgroundColor: "#E5E5EA",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  profilePictureText: {
+    fontSize: 40,
+    color: "#666",
   },
   name: {
     fontSize: 24,

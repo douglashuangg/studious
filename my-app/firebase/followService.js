@@ -166,7 +166,7 @@ export const getFollowers = async (userId, limitCount = 50) => {
           displayName: userData.displayName || 'Unknown User',
           username: userData.username || userData.email?.split('@')[0] || 'user',
           bio: userData.bio || '',
-          profilePicture: userData.profilePicture || null,
+          profilePicture: userData.profilePictureUrl || null,
           followerCount: userData.followerCount || 0,
           followingCount: userData.followingCount || 0,
           followedAt: followData.createdAt
@@ -213,7 +213,7 @@ export const getFollowing = async (userId, limitCount = 50) => {
           displayName: userData.displayName || 'Unknown User',
           username: userData.username || userData.email?.split('@')[0] || 'user',
           bio: userData.bio || '',
-          profilePicture: userData.profilePicture || null,
+          profilePicture: userData.profilePictureUrl || null,
           followerCount: userData.followerCount || 0,
           followingCount: userData.followingCount || 0,
           followedAt: followData.createdAt
@@ -314,7 +314,7 @@ export const searchUsers = async (searchTerm, currentUserId, limitCount = 20) =>
           displayName: displayName,
           username: username,
           bio: userData.bio || '',
-          profilePicture: userData.profilePicture || null,
+          profilePicture: userData.profilePictureUrl || null,
           followerCount: userData.followerCount || 0,
           followingCount: userData.followingCount || 0
         });

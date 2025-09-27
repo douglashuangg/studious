@@ -98,12 +98,18 @@ export default function Following() {
               style={styles.itemRow}
               onPress={() => navigateToExternalProfile(item.id, returnTo as string, originalReturnTo as string)}
             >
-              <Image 
-                source={{ 
-                  uri: item.profilePicture || `https://via.placeholder.com/60x60/2D5A27/FFFFFF?text=${item.displayName.charAt(0).toUpperCase()}` 
-                }} 
-                style={styles.avatar} 
-              />
+              {item.profilePicture ? (
+                <Image 
+                  source={{ uri: item.profilePicture }} 
+                  style={styles.avatar} 
+                />
+              ) : (
+                <View style={styles.avatar}>
+                  <Text style={styles.avatarText}>
+                    {item.displayName.split(' ').map(name => name.charAt(0)).join('').toUpperCase()}
+                  </Text>
+                </View>
+              )}
               <View style={styles.itemText}>
                 <Text style={styles.name}>{item.displayName}</Text>
                 <Text style={styles.username}>@{item.username}</Text>
@@ -160,6 +166,13 @@ const styles = StyleSheet.create({
     height: 48,
     borderRadius: 24,
     marginRight: 12,
+    backgroundColor: "#E5E5EA",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  avatarText: {
+    fontSize: 18,
+    color: "#666",
   },
   itemText: {
     flex: 1,

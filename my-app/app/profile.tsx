@@ -241,12 +241,18 @@ export default function Profile() {
       <View style={styles.header}>
         <View style={styles.profileSection}>
           <View style={styles.profilePictureContainer}>
-            <Image
-              source={{ 
-                uri: userProfile?.profilePictureUrl || "https://via.placeholder.com/120x120/007AFF/FFFFFF?text=U" 
-              }}
-              style={styles.profilePicture}
-            />
+            {userProfile?.profilePictureUrl ? (
+              <Image
+                source={{ uri: userProfile.profilePictureUrl }}
+                style={styles.profilePicture}
+              />
+            ) : (
+              <View style={styles.profilePicture}>
+                <Text style={styles.profilePictureText}>
+                  {userProfile?.displayName?.split(' ').map(name => name.charAt(0)).join('').toUpperCase() || 'U'}
+                </Text>
+              </View>
+            )}
           </View>
           
           <View style={styles.followContainer}>
@@ -411,6 +417,13 @@ const styles = StyleSheet.create({
     width: 100,
     height: 100,
     borderRadius: 50,
+    backgroundColor: "#E5E5EA",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  profilePictureText: {
+    fontSize: 40,
+    color: "#666",
   },
   name: {
     fontSize: 24,
