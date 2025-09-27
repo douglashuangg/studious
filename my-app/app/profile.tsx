@@ -140,6 +140,73 @@ export default function Profile() {
     }
   };
 
+  const formatTimeRange = (startTime: any, endTime: any) => {
+    if (!startTime || !endTime) return "Time not available";
+    
+    const start = startTime?.toDate ? startTime.toDate() : new Date(startTime);
+    const end = endTime?.toDate ? endTime.toDate() : new Date(endTime);
+    
+    const startTimeStr = start.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    
+    const endTimeStr = end.toLocaleTimeString('en-US', {
+      hour: 'numeric',
+      minute: '2-digit',
+      hour12: true
+    });
+    
+    return `${startTimeStr} - ${endTimeStr}`;
+  };
+
+  const formatDateHeader = (date: Date) => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    if (date.toDateString() === today.toDateString()) {
+      return "Today";
+    } else if (date.toDateString() === yesterday.toDateString()) {
+      return "Yesterday";
+    } else {
+      return date.toLocaleDateString('en-US', {
+        weekday: 'long',
+        month: 'short',
+        day: 'numeric',
+        year: 'numeric'
+      });
+    }
+  };
+
+  const groupSessionsByDay = (sessions: any[]) => {
+    const grouped: { [key: string]: any[] } = {};
+    
+    sessions.forEach(session => {
+      // Use start time for grouping by day, fallback to createdAt if start time not available
+      const sessionDate = session.startTime?.toDate ? session.startTime.toDate() : 
+                         session.createdAt?.toDate ? session.createdAt.toDate() : 
+                         new Date(session.createdAt);
+      const dateKey = sessionDate.toDateString();
+      
+      if (!grouped[dateKey]) {
+        grouped[dateKey] = [];
+      }
+      grouped[dateKey].push(session);
+    });
+    
+    // Sort dates in descending order (most recent first)
+    const sortedDates = Object.keys(grouped).sort((a, b) => {
+      return new Date(b).getTime() - new Date(a).getTime();
+    });
+    
+    return sortedDates.map(dateKey => ({
+      date: new Date(dateKey),
+      sessions: grouped[dateKey]
+    }));
+  };
+
   const handleLogout = () => {
     Alert.alert(
       'Logout',
@@ -250,47 +317,60 @@ export default function Profile() {
         </View>
       </TouchableOpacity>
 
-      {/* Recent Activity */}
+      {/* All Activity */}
       <View style={styles.activityContainer}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
+        <Text style={styles.sectionTitle}>All Activity</Text>
         {loading ? (
           <View style={styles.activityItem}>
             <View style={styles.activityIcon}>
               <Ionicons name="calendar" size={20} color="#34C759" />
             </View>
             <View style={styles.activityContent}>
-              <Text style={styles.activityText}>Loading recent activity...</Text>
+              <Text style={styles.activityText}>Loading activity...</Text>
             </View>
           </View>
         ) : studySessions.length > 0 ? (
-          studySessions.slice(0, 3).map((session, index) => {
-            const sessionDate = session.createdAt?.toDate ? session.createdAt.toDate() : new Date(session.createdAt);
-            const timeAgo = getTimeAgo(sessionDate);
-            
-            let sessionDuration = 0;
-            if (session.startTime && session.endTime) {
-              const start = session.startTime?.toDate ? session.startTime.toDate() : new Date(session.startTime);
-              const end = session.endTime?.toDate ? session.endTime.toDate() : new Date(session.endTime);
-              const durationMs = end.getTime() - start.getTime();
-              sessionDuration = durationMs / (1000 * 60 * 60); // Convert to hours
-            } else if (session.duration) {
-              sessionDuration = session.duration / 3600; // Convert seconds to hours
-            }
-            
-            return (
-              <View key={session.id} style={styles.activityItem}>
-                <View style={styles.activityIcon}>
-                  <Ionicons name="book" size={20} color="#2563EB" />
-                </View>
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityText}>
-                    Studied {session.subject} for {formatTime(sessionDuration)}
-                  </Text>
-                  <Text style={styles.activityTime}>{timeAgo}</Text>
-                </View>
+          groupSessionsByDay(studySessions).map((dayGroup, dayIndex) => (
+            <View key={dayGroup.date.toDateString()}>
+              <View style={styles.dayHeader}>
+                <Text style={styles.dayHeaderText}>{formatDateHeader(dayGroup.date)}</Text>
               </View>
-            );
-          })
+              {dayGroup.sessions.map((session, sessionIndex) => {
+                // Use start time for "time ago" calculation, fallback to createdAt if start time not available
+                const sessionDate = session.startTime?.toDate ? session.startTime.toDate() : 
+                                  session.createdAt?.toDate ? session.createdAt.toDate() : 
+                                  new Date(session.createdAt);
+                const timeAgo = getTimeAgo(sessionDate);
+                
+                let sessionDuration = 0;
+                if (session.startTime && session.endTime) {
+                  const start = session.startTime?.toDate ? session.startTime.toDate() : new Date(session.startTime);
+                  const end = session.endTime?.toDate ? session.endTime.toDate() : new Date(session.endTime);
+                  const durationMs = end.getTime() - start.getTime();
+                  sessionDuration = durationMs / (1000 * 60 * 60); // Convert to hours
+                } else if (session.duration) {
+                  sessionDuration = session.duration / 3600; // Convert seconds to hours
+                }
+                
+                const timeRange = formatTimeRange(session.startTime, session.endTime);
+                
+                return (
+                  <View key={session.id} style={styles.activityItem}>
+                    <View style={styles.activityIcon}>
+                      <Ionicons name="book" size={20} color="#2563EB" />
+                    </View>
+                    <View style={styles.activityContent}>
+                      <Text style={styles.activityText}>
+                        Studied {session.subject} for {formatTime(sessionDuration)}
+                      </Text>
+                      <Text style={styles.activityTimeRange}>{timeRange}</Text>
+                      <Text style={styles.activityTime}>{timeAgo}</Text>
+                    </View>
+                  </View>
+                );
+              })}
+            </View>
+          ))
         ) : (
           <View style={styles.activityItem}>
             <View style={styles.activityIcon}>
@@ -493,7 +573,7 @@ const styles = StyleSheet.create({
   },
   activityItem: {
     flexDirection: "row",
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#fafbfc",
     padding: 15,
     borderRadius: 12,
     marginBottom: 10,
@@ -524,6 +604,24 @@ const styles = StyleSheet.create({
   activityTime: {
     fontSize: 14,
     color: "#666",
+  },
+  activityTimeRange: {
+    fontSize: 13,
+    color: "#888",
+    marginBottom: 2,
+  },
+  dayHeader: {
+    backgroundColor: "#f0f0f0",
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    marginTop: 15,
+    marginBottom: 8,
+    borderRadius: 8,
+  },
+  dayHeaderText: {
+    fontSize: 16,
+    fontWeight: "bold",
+    color: "#333",
   },
   betaContainer: {
     backgroundColor: "#007AFF",
