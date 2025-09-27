@@ -96,11 +96,9 @@ export default function EditProfile() {
       if (userDoc.exists()) {
         // Update existing document
         await updateDoc(userDocRef, userData);
-        console.log('✅ Profile updated successfully');
       } else {
         // Create new document
         await setDoc(userDocRef, userData);
-        console.log('✅ Profile created successfully');
       }
       
       Alert.alert("Success", "Profile saved successfully!", [

@@ -88,7 +88,6 @@ export default function Search() {
       userToUpdate.isFollowing,
       () => {
         // Success callback - UI already updated
-        console.log('Follow operation successful');
       },
       (error) => {
         // Error callback - revert UI state

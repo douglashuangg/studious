@@ -64,7 +64,6 @@ export default function Calendar() {
       // Calculate scroll position
       const scrollPosition = minutesFromDayStart * pixelsPerMinute;
       
-      console.log(`Auto-scroll: Current time ${currentHour}:${currentMinute.toString().padStart(2, '0')}, Minutes from start: ${minutesFromDayStart}, Scroll position: ${scrollPosition}px`);
       
       // Scroll to current time with some offset to center it
       setTimeout(() => {
@@ -101,11 +100,6 @@ export default function Calendar() {
     const top = startMinutesFromMidnight * pixelsPerMinute;
     const height = (endMinutesFromMidnight - startMinutesFromMidnight) * pixelsPerMinute;
     
-    console.log(`Session "${session.subject}":`);
-    console.log(`  Start: ${sessionStart.toLocaleTimeString()} (${startMinutesFromMidnight.toFixed(1)}min from midnight)`);
-    console.log(`  End: ${sessionEnd.toLocaleTimeString()} (${endMinutesFromMidnight.toFixed(1)}min from midnight)`);
-    console.log(`  Duration: ${(endMinutesFromMidnight - startMinutesFromMidnight).toFixed(1)} minutes`);
-    console.log(`  Top: ${top.toFixed(1)}px, Height: ${height.toFixed(1)}px`);
     
     return { top, height };
   };
@@ -327,22 +321,6 @@ export default function Calendar() {
       });
       
       // Process sessions
-      console.log("=== FIREBASE DATA DEBUG ===");
-      console.log("User sessions from Firebase:", userSessions);
-      console.log("Sessions for date:", sessionsForDate);
-      console.log("Number of sessions found:", sessionsForDate.length);
-      
-      if (sessionsForDate.length > 0) {
-        console.log("=== FIRST SESSION FULL OBJECT ===");
-        console.log("Complete session object:", JSON.stringify(sessionsForDate[0], null, 2));
-        console.log("Session keys:", Object.keys(sessionsForDate[0]));
-        console.log("Session startTime type:", typeof sessionsForDate[0].startTime);
-        console.log("Session endTime type:", typeof sessionsForDate[0].endTime);
-        console.log("Session createdAt type:", typeof sessionsForDate[0].createdAt);
-        console.log("Session updatedAt type:", typeof sessionsForDate[0].updatedAt);
-      }
-      
-      console.log("=== END FIREBASE DEBUG ===");
       return sessionsForDate;
     } catch (error) {
       console.error("Error loading user sessions from Firebase:", error);

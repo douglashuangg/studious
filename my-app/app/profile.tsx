@@ -39,10 +39,8 @@ export default function Profile() {
           const userDoc = await getDoc(doc(db, 'users', user.uid));
           if (userDoc.exists()) {
             const profileData = userDoc.data();
-            console.log('📱 Loaded user profile data:', profileData);
             setUserProfile(profileData);
           } else {
-            console.log('📱 No user profile document found, user needs to create profile');
           }
           
           // Fetch follow counts
@@ -69,7 +67,6 @@ export default function Profile() {
             const userDoc = await getDoc(doc(db, 'users', user.uid));
             if (userDoc.exists()) {
               const profileData = userDoc.data();
-              console.log('🔄 Reloaded user profile data:', profileData);
               setUserProfile(profileData);
             }
             

@@ -38,14 +38,20 @@ export default function Record() {
   // Load custom subjects from storage and Firebase sessions
   useEffect(() => {
     const loadCustomSubjects = async () => {
+      if (!user) {
+        setCustomSubjects([]);
+        return;
+      }
+
       try {
-        // Load from AsyncStorage first
-        const saved = await AsyncStorage.getItem('customSubjects');
+        // Load from AsyncStorage with user-specific key
+        const userKey = `customSubjects_${user.uid}`;
+        const saved = await AsyncStorage.getItem(userKey);
         if (saved) {
           setCustomSubjects(JSON.parse(saved));
         }
 
-        // Also load unique subjects from Firebase sessions
+        // Also load unique subjects from Firebase sessions for this user
         const { getStudySessions } = await import("../firebase/studySessionService.js");
         const sessions = await getStudySessions();
         const uniqueSubjects = [...new Set(sessions.map(session => session.subject).filter(Boolean))];
@@ -59,12 +65,15 @@ export default function Record() {
       }
     };
     loadCustomSubjects();
-  }, []);
+  }, [user]);
 
   // Save custom subjects to storage
   const saveCustomSubjects = async (subjects: string[]) => {
+    if (!user) return;
+    
     try {
-      await AsyncStorage.setItem('customSubjects', JSON.stringify(subjects));
+      const userKey = `customSubjects_${user.uid}`;
+      await AsyncStorage.setItem(userKey, JSON.stringify(subjects));
     } catch (error) {
       console.error('Error saving custom subjects:', error);
     }
@@ -96,12 +105,6 @@ export default function Record() {
         
         // Use the calculated elapsed time
         setSeconds(restoredState.elapsedTime || 0);
-        
-        console.log("Timer state restored from background:", {
-          isRecording: true,
-          elapsed: restoredState.elapsedTime,
-          subject: restoredState.subject
-        });
       }
     };
 
@@ -121,14 +124,12 @@ export default function Record() {
           notes,
           elapsedTime: seconds
         });
-        console.log("Timer state saved for background");
       } else if (nextAppState === 'active' && isRecording) {
         // Restore timer when coming back to foreground
         const restoreTimer = async () => {
           const restoredState = await restoreTimerState();
           if (restoredState && restoredState.isRecording) {
             setSeconds(restoredState.elapsedTime);
-            console.log("Timer restored from background:", restoredState.elapsedTime, "seconds");
           }
         };
         restoreTimer();
@@ -194,7 +195,6 @@ export default function Record() {
       if (user) {
         try {
           await setCurrentlyStudying(user.uid, subject, startTime.getTime(), notes);
-          console.log('✅ Set as currently studying');
         } catch (error) {
           console.error('❌ Error setting currently studying status:', error);
         }
@@ -224,13 +224,11 @@ export default function Record() {
     if (user) {
       try {
         await setCurrentlyStudying(user.uid, subject, sessionStartTime.getTime(), notes, newPausedState, 0);
-        console.log(`✅ Updated currently studying: ${newPausedState ? 'paused' : 'resumed'}`);
       } catch (error) {
         console.error('❌ Error updating currently studying status:', error);
       }
     }
 
-    console.log(`Timer ${newPausedState ? 'paused' : 'resumed'} - still currently studying`);
   };
 
   const handleStop = () => {
@@ -295,7 +293,6 @@ export default function Record() {
     if (user) {
       try {
         await removeCurrentlyStudying(user.uid);
-        console.log('✅ Removed from currently studying');
       } catch (error) {
         console.error('❌ Error removing currently studying status:', error);
       }
@@ -332,17 +329,11 @@ export default function Record() {
         if (user && restoredState.subject) {
           try {
             await setCurrentlyStudying(user.uid, restoredState.subject, restoredState.startTime, restoredState.notes || '', restoredState.isPaused || false, 0);
-            console.log('✅ Restored currently studying status');
           } catch (error) {
             console.error('❌ Error restoring currently studying status:', error);
           }
         }
         
-        console.log("Timer state restored from background:", {
-          isRecording: true,
-          elapsed: restoredState.elapsedTime,
-          subject: restoredState.subject
-        });
       }
     };
 
@@ -362,14 +353,12 @@ export default function Record() {
           notes,
           elapsedTime: seconds
         });
-        console.log("Timer state saved for background");
       } else if (nextAppState === 'active' && isRecording) {
         // Restore timer when coming back to foreground
         const restoreTimer = async () => {
           const restoredState = await restoreTimerState();
           if (restoredState && restoredState.isRecording) {
             setSeconds(restoredState.elapsedTime);
-            console.log("Timer restored from background:", restoredState.elapsedTime, "seconds");
           }
         };
         restoreTimer();
@@ -592,21 +581,23 @@ export default function Record() {
               </View>
             </View>
 
-            {/* Quick Subject Pills */}
-            <View style={styles.pillsContainer}>
-              {["Math", "Code", "Read", "Science", "History"].map((subj) => (
-                <TouchableOpacity
-                  key={subj}
-                  style={[styles.pill, subject === subj && styles.selectedPill]}
-                  onPress={() => setSubject(subj)}
-                  disabled={isRecording}
-                >
-                  <Text style={[styles.pillText, subject === subj && styles.selectedPillText]}>
-                    {subj}
-                  </Text>
-                </TouchableOpacity>
-              ))}
-            </View>
+            {/* Quick Subject Pills - User's Custom Subjects Only */}
+            {customSubjects.length > 0 && (
+              <View style={styles.pillsContainer}>
+                {customSubjects.map((subj) => (
+                  <TouchableOpacity
+                    key={subj}
+                    style={[styles.pill, subject === subj && styles.selectedPill]}
+                    onPress={() => setSubject(subj)}
+                    disabled={isRecording}
+                  >
+                    <Text style={[styles.pillText, subject === subj && styles.selectedPillText]}>
+                      {subj}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            )}
 
             {/* Notes Section */}
             <View style={styles.notesCard}>

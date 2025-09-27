@@ -238,7 +238,6 @@ export default function Index() {
 
   const handleComment = (activityId: string) => {
     // Handle comment functionality
-    console.log("Comment on activity:", activityId);
   };
 
   const handleLike = async (postId: string) => {
