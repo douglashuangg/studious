@@ -1,4 +1,5 @@
 import { Text, View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
@@ -10,6 +11,7 @@ import { useCurrentlyStudying } from "../hooks/useCurrentlyStudying";
 import { formatCurrentlyStudyingForHomePage } from "../utils/currentlyStudyingUtils";
 
 export default function Index() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user } = useAuth();
   
@@ -332,7 +334,7 @@ export default function Index() {
       }
     >
       {/* Alpha Badge */}
-      <View style={styles.betaContainer}>
+      <View style={[styles.betaContainer, { marginTop: insets.top }]}>
         <View style={styles.betaBadge}>
           <Text style={styles.betaText}>ALPHA v0.1.0</Text>
         </View>
@@ -853,6 +855,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 20,
     alignItems: "center",
+    marginTop: 10,
   },
   betaBadge: {
     // No additional styling needed - container handles it

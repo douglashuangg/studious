@@ -12,6 +12,7 @@ export default function RootLayout() {
       screenOptions={{
         tabBarActiveTintColor: "#4A7C59",
         tabBarInactiveTintColor: "#8E8E93",
+        headerShown: false,
         tabBarStyle: {
           backgroundColor: "#FFFFFF",
           borderTopWidth: 1,
@@ -30,7 +31,7 @@ export default function RootLayout() {
       <Tabs.Screen
         name="index"
         options={{
-          title: "Studious",
+          // title: "Studious",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
           ),
@@ -39,7 +40,7 @@ export default function RootLayout() {
       <Tabs.Screen
         name="record"
         options={{
-          title: "Timer",
+          // title: "Timer",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="stopwatch" size={size} color={color} />
           ),
@@ -48,7 +49,7 @@ export default function RootLayout() {
       <Tabs.Screen
         name="calendar"
         options={{
-          title: "Calendar",
+          // title: "Calendar",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar" size={size} color={color} />
           ),
@@ -57,7 +58,7 @@ export default function RootLayout() {
       <Tabs.Screen
         name="profile"
         options={{
-          title: "Profile",
+          // title: "Profile",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
           ),

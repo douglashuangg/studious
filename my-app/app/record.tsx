@@ -1,4 +1,6 @@
 import { Text, View, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert, Modal, AppState, KeyboardAvoidingView, Platform } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import PageHeader from "../components/PageHeader";
 import { Ionicons } from "@expo/vector-icons";
 import { useState, useEffect } from "react";
 import AsyncStorage from '@react-native-async-storage/async-storage';
@@ -18,6 +20,7 @@ import {
 } from "../firebase/currentlyStudyingService.js";
 
 export default function Record() {
+  const insets = useSafeAreaInsets();
   const { user } = useAuth();
   
   // Recording states
@@ -389,15 +392,15 @@ export default function Record() {
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        {/* Alpha Header */}
-        <View style={styles.betaContainer}>
-          <Text style={styles.betaText}>ALPHA v0.1.0</Text>
-        </View>
+        <PageHeader 
+          title="Focus Timer"
+          left={<TouchableOpacity onPress={() => {}} style={{ padding: 8 }}><Ionicons name="chevron-back" size={24} color="#000" /></TouchableOpacity>}
+          right={<View style={{ width: 24 }} />}
+        />
 
         {/* Modern Header with Gradient */}
         <View style={styles.header}>
           <View style={styles.headerContent}>
-            <Text style={styles.title}>Focus Timer</Text>
             <Text style={styles.subtitle}>Deep work sessions</Text>
           </View>
           <View style={styles.headerDecoration} />
@@ -1227,6 +1230,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 20,
     alignItems: "center",
+    marginTop: 10,
   },
   betaText: {
     fontSize: 12,

@@ -1,4 +1,6 @@
 import { Text, View, StyleSheet, TouchableOpacity, TextInput, ScrollView, Alert, Modal, Dimensions, AppState } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import PageHeader from "../components/PageHeader";
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect, useRef } from "react";
@@ -7,6 +9,7 @@ import { saveStudySession } from "../firebase/studySessionService.js";
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
 export default function Calendar() {
+  const insets = useSafeAreaInsets();
   // Recording states
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -376,10 +379,11 @@ export default function Calendar() {
 
   return (
     <View style={styles.container}>
-      {/* Alpha Header */}
-      <View style={styles.betaContainer}>
-        <Text style={styles.betaText}>ALPHA v0.1.0</Text>
-      </View>
+      <PageHeader 
+        title="Study Calendar"
+        left={<TouchableOpacity onPress={() => {}} style={{ padding: 8 }}><Ionicons name="chevron-back" size={24} color="#000" /></TouchableOpacity>}
+        right={<View style={{ width: 24 }} />}
+      />
 
       {/* Calendar Header */}
       <View style={styles.calendarHeader}>
@@ -388,7 +392,7 @@ export default function Calendar() {
         </TouchableOpacity>
         
         <View style={styles.dateContainer}>
-          <Text style={styles.calendarTitle}>Study Calendar</Text>
+          {/* <Text style={styles.calendarTitle}>Study Calendar</Text> */}
           <Text style={styles.dateText}>{formatDate(selectedDate)}</Text>
         </View>
         
@@ -1096,6 +1100,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 20,
     alignItems: "center",
+    marginTop: 10,
   },
   betaText: {
     fontSize: 12,

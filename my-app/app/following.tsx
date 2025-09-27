@@ -5,6 +5,7 @@ import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { getFollowing, unfollowUser } from "../firebase/followService";
 import { navigateToExternalProfile, navigateBack } from "../utils/navigationUtils";
+import PageHeader from "../components/PageHeader";
 
 interface FollowingUser {
   id: string;
@@ -61,24 +62,26 @@ export default function Following() {
 
   return (
     <View style={styles.container}>
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton} 
-          onPress={() => {
-            if (returnTo && typeof returnTo === 'string') {
-              const additionalParams: { originalReturnTo?: string } = {};
-              if (originalReturnTo) additionalParams.originalReturnTo = originalReturnTo as string;
-              navigateBack(returnTo, userId as string, additionalParams);
-            } else {
-              router.back();
-            }
-          }}
-        >
-          <Ionicons name="chevron-back" size={24} color="#2D5A27" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Following</Text>
-        <View style={{ width: 40 }} />
-      </View>
+      <PageHeader 
+        title="Following"
+        left={
+          <TouchableOpacity 
+            style={styles.backButton} 
+            onPress={() => {
+              if (returnTo && typeof returnTo === 'string') {
+                const additionalParams: { originalReturnTo?: string } = {};
+                if (originalReturnTo) additionalParams.originalReturnTo = originalReturnTo as string;
+                navigateBack(returnTo, userId as string, additionalParams);
+              } else {
+                router.back();
+              }
+            }}
+          >
+            <Ionicons name="chevron-back" size={24} color="#2D5A27" />
+          </TouchableOpacity>
+        }
+        right={<View style={{ width: 40 }} />}
+      />
 
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -137,15 +140,6 @@ const styles = StyleSheet.create({
     flex: 1,
     backgroundColor: "#ffffff",
   },
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
-  },
   backButton: {
     width: 40,
     height: 40,
@@ -153,11 +147,6 @@ const styles = StyleSheet.create({
     justifyContent: "center",
     borderRadius: 8,
     backgroundColor: "#f0f0f0",
-  },
-  title: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#000",
   },
   listContent: {
     padding: 16,
