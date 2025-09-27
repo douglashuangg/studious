@@ -1,4 +1,5 @@
 import { Text, View, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from "react-native";
+import PageHeader from "../components/PageHeader";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
@@ -8,7 +9,7 @@ import { db } from "../firebase/firebaseInit";
 
 export default function EditProfile() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   
   // Form state
   const [firstName, setFirstName] = useState("");
@@ -101,9 +102,10 @@ export default function EditProfile() {
         { text: "OK", onPress: () => router.push("/profile") }
       ]);
       
-    } catch (error) {
-      console.error('❌ Error saving profile:', error);
-      Alert.alert("Error", `Failed to save profile: ${error.message || 'Unknown error'}`);
+    } catch (err) {
+      console.error('❌ Error saving profile:', err);
+      const message = err instanceof Error ? err.message : 'Unknown error';
+      Alert.alert("Error", `Failed to save profile: ${message}`);
     } finally {
       setSaving(false);
     }
@@ -147,26 +149,23 @@ export default function EditProfile() {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={handleBack}
-        >
-          <Ionicons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Edit Profile</Text>
-        <TouchableOpacity 
-          style={styles.saveButton}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color="#2D5A27" />
-          ) : (
-            <Text style={styles.saveButtonText}>Save</Text>
-          )}
-        </TouchableOpacity>
-      </View>
+      <PageHeader
+        title="Edit Profile"
+        left={
+          <TouchableOpacity style={styles.backButton} onPress={handleBack}>
+            <Ionicons name="arrow-back" size={24} color="#000" />
+          </TouchableOpacity>
+        }
+        right={
+          <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
+            {saving ? (
+              <ActivityIndicator size="small" color="#2D5A27" />
+            ) : (
+              <Text style={styles.saveButtonText}>Save</Text>
+            )}
+          </TouchableOpacity>
+        }
+      />
 
       {/* Profile Picture Section */}
       <View style={styles.profilePictureSection}>

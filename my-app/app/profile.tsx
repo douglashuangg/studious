@@ -1,4 +1,5 @@
 import { Text, View, StyleSheet, Image, TouchableOpacity, ScrollView, Alert } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
@@ -12,6 +13,7 @@ import { navigateToStatistics, navigateToFollowers, navigateToFollowing } from "
 import React from 'react';
 
 export default function Profile() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user, logout } = useAuth();
   const [studySessions, setStudySessions] = useState<any[]>([]);
@@ -163,7 +165,7 @@ export default function Profile() {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Alpha Header */}
-      <View style={styles.betaContainer}>
+      <View style={[styles.betaContainer, { marginTop: insets.top }]}>
         <Text style={styles.betaText}>ALPHA v0.1.0</Text>
       </View>
 
@@ -530,6 +532,7 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 20,
     alignItems: "center",
+    marginTop: 10,
   },
   betaText: {
     fontSize: 12,
