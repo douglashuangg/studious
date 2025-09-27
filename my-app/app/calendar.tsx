@@ -3,23 +3,12 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect, useRef } from "react";
 import { saveStudySession } from "../firebase/studySessionService.js";
-// TIMER IMPORTS COMMENTED OUT
-// import { 
-//   startBackgroundTimer, 
-//   stopBackgroundTimer, 
-//   saveTimerState, 
-//   loadTimerState, 
-//   clearTimerState,
-//   restoreTimerState,
-//   calculateElapsedTime
-// } from "../backgroundTimerService.js";
 
-const { height: screenHeight } = Dimensions.get('window');
+const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
 export default function Calendar() {
   // Recording states
   const [isRecording, setIsRecording] = useState(false);
-  const [timeSlotHeight, setTimeSlotHeight] = useState(60); // Default height
   const [isPaused, setIsPaused] = useState(false);
   const [seconds, setSeconds] = useState(0);
   const [subject, setSubject] = useState("");
@@ -31,19 +20,24 @@ export default function Calendar() {
   const [selectedDate, setSelectedDate] = useState(new Date());
   const [showRecordModal, setShowRecordModal] = useState(false);
   const scrollViewRef = useRef<ScrollView>(null);
+  
+  // Timeline configuration
+  const [pixelsPerMinute, setPixelsPerMinute] = useState(2); // Default: 2px per minute
+  const [timelineHeight, setTimelineHeight] = useState(0);
+  
+  // Timeline constants
+  const DAY_START_HOUR = 0; // 12:00 AM (midnight)
+  const DAY_END_HOUR = 24; // 12:00 AM (midnight) - next day
+  const TOTAL_MINUTES = (DAY_END_HOUR - DAY_START_HOUR) * 60; // 24 hours = 1440 minutes
 
-  // TIMER FUNCTIONALITY COMMENTED OUT
-  // useEffect(() => {
-  //   let interval: ReturnType<typeof setInterval>;
-    
-  //   if (isRecording && !isPaused) {
-  //     interval = setInterval(() => {
-  //       setSeconds(seconds => seconds + 1);
-  //     }, 1000);
-  //   }
-    
-  //   return () => clearInterval(interval);
-  // }, [isRecording, isPaused]);
+  // Calculate pixels per minute based on screen size
+  useEffect(() => {
+    // Use a fixed pixels per minute to ensure scrollable content
+    const fixedPixelsPerMinute = 2; // 2px per minute = 2880px for 24 hours
+    setPixelsPerMinute(fixedPixelsPerMinute);
+    // Add minimal padding to ensure the 12:00 AM marker is visible above navbar
+    setTimelineHeight(TOTAL_MINUTES * fixedPixelsPerMinute + 20);
+  }, []);
 
   // Calendar time update
   useEffect(() => {
@@ -54,20 +48,19 @@ export default function Calendar() {
     return () => clearInterval(timer);
   }, []);
 
-  // Auto-scroll to current time only when component first mounts
+  // Auto-scroll to current time
   useEffect(() => {
-    if (scrollViewRef.current && timeSlotHeight > 0) {
+    if (scrollViewRef.current && pixelsPerMinute > 0) {
       const currentHour = currentTime.getHours();
       const currentMinute = currentTime.getMinutes();
       
-      // Calculate which time slot the current time falls into
-      // Each hour has 2 slots: :00-:30 and :30-:60
-      const slotIndex = currentHour * 2 + (currentMinute >= 30 ? 1 : 0);
+      // Calculate minutes from day start
+      const minutesFromDayStart = (currentHour - DAY_START_HOUR) * 60 + currentMinute;
       
-      // Calculate scroll position (each time slot is timeSlotHeight pixels)
-      const scrollPosition = slotIndex * timeSlotHeight;
+      // Calculate scroll position
+      const scrollPosition = minutesFromDayStart * pixelsPerMinute;
       
-      console.log(`Auto-scroll: Current time ${currentHour}:${currentMinute.toString().padStart(2, '0')}, Slot index: ${slotIndex}, Scroll position: ${scrollPosition}px`);
+      console.log(`Auto-scroll: Current time ${currentHour}:${currentMinute.toString().padStart(2, '0')}, Minutes from start: ${minutesFromDayStart}, Scroll position: ${scrollPosition}px`);
       
       // Scroll to current time with some offset to center it
       setTimeout(() => {
@@ -77,8 +70,46 @@ export default function Calendar() {
         });
       }, 100); // Small delay to ensure layout is complete
     }
-  }, [timeSlotHeight]); // Only trigger when timeSlotHeight changes (initial load)
+  }, [pixelsPerMinute]); // Trigger when pixelsPerMinute changes
 
+  // Timeline helper functions
+  const getDayStart = (date: Date) => {
+    const dayStart = new Date(date);
+    dayStart.setHours(DAY_START_HOUR, 0, 0, 0);
+    return dayStart;
+  };
+
+  const getMinutesFromDayStart = (date: Date) => {
+    const dayStart = getDayStart(selectedDate);
+    return (date.getTime() - dayStart.getTime()) / (1000 * 60);
+  };
+
+  const getSessionPosition = (session: any) => {
+    // Use the actual startTime and endTime fields from the session
+    const sessionStart = session.startTime?.toDate ? session.startTime.toDate() : new Date(session.startTime);
+    const sessionEnd = session.endTime?.toDate ? session.endTime.toDate() : new Date(session.endTime);
+    const dayStart = getDayStart(selectedDate);
+    
+    // Calculate start and end positions
+    const startMinutesFromMidnight = (sessionStart.getTime() - dayStart.getTime()) / (1000 * 60);
+    const endMinutesFromMidnight = (sessionEnd.getTime() - dayStart.getTime()) / (1000 * 60);
+    
+    const top = startMinutesFromMidnight * pixelsPerMinute;
+    const height = (endMinutesFromMidnight - startMinutesFromMidnight) * pixelsPerMinute;
+    
+    console.log(`Session "${session.subject}":`);
+    console.log(`  Start: ${sessionStart.toLocaleTimeString()} (${startMinutesFromMidnight.toFixed(1)}min from midnight)`);
+    console.log(`  End: ${sessionEnd.toLocaleTimeString()} (${endMinutesFromMidnight.toFixed(1)}min from midnight)`);
+    console.log(`  Duration: ${(endMinutesFromMidnight - startMinutesFromMidnight).toFixed(1)} minutes`);
+    console.log(`  Top: ${top.toFixed(1)}px, Height: ${height.toFixed(1)}px`);
+    
+    return { top, height };
+  };
+
+  const getCurrentTimePosition = () => {
+    const minutesFromDayStart = getMinutesFromDayStart(currentTime);
+    return minutesFromDayStart * pixelsPerMinute;
+  };
 
   const formatTime = (totalSeconds: number) => {
     const hours = Math.floor(totalSeconds / 3600);
@@ -132,34 +163,6 @@ export default function Calendar() {
     });
   };
 
-  const calculateSessionHeight = (session: any) => {
-    // Calculate actual duration from Firebase timestamps
-    const sessionStart = session.createdAt?.toDate ? session.createdAt.toDate() : new Date(session.createdAt);
-    const sessionEnd = session.updatedAt?.toDate ? session.updatedAt.toDate() : new Date(session.updatedAt);
-    
-    const durationMs = sessionEnd.getTime() - sessionStart.getTime();
-    const durationMinutes = durationMs / (1000 * 60);
-    
-    // Use consistent time slot dimensions: 60px for 30 minutes = 2px per minute
-    const height = durationMinutes * getPixelsPerMinute();
-    
-    return Math.max(height, 20); // Minimum 20px so it's visible
-  };
-
-  const calculateSessionTop = (session: any) => {
-    // Use actual Firebase timestamp
-    const sessionStart = session.createdAt?.toDate ? session.createdAt.toDate() : new Date(session.createdAt);
-    const startHour = sessionStart.getHours();
-    const startMinute = sessionStart.getMinutes();
-    
-    // Calculate position within the current time slot
-    // Use consistent time slot dimensions: 60px for 30 minutes = 2px per minute
-    const minutesWithinSlot = startMinute % 30; // Minutes within the 30-minute slot
-    const topPosition = minutesWithinSlot * getPixelsPerMinute(); // Use consistent calculation
-    
-    return topPosition;
-  };
-
   const handleStart = async () => {
     if (!subject.trim()) {
       Alert.alert("Subject Required", "Please enter a subject for your study session.");
@@ -170,21 +173,6 @@ export default function Calendar() {
       setSeconds(0);
       const startTime = new Date();
       setSessionStartTime(startTime); // Record the start time
-      
-      // TIMER FUNCTIONALITY COMMENTED OUT
-      // Start background timer (may not be available on all devices)
-      // const backgroundTimerStarted = await startBackgroundTimer();
-      
-      // Save timer state
-      // await saveTimerState({
-      //   isRecording: true,
-      //   isPaused: false,
-      //   startTime: startTime.getTime(),
-      //   subject,
-      //   notes,
-      //   elapsedTime: 0,
-      //   backgroundTimerEnabled: backgroundTimerStarted
-      // });
     }
     setIsRecording(true);
     setIsPaused(false);
@@ -193,19 +181,6 @@ export default function Calendar() {
   const handlePause = async () => {
     const newPausedState = !isPaused;
     setIsPaused(newPausedState);
-    
-    // TIMER FUNCTIONALITY COMMENTED OUT
-    // Save paused state
-    // if (sessionStartTime) {
-    //   await saveTimerState({
-    //     isRecording,
-    //     isPaused: newPausedState,
-    //     startTime: sessionStartTime.getTime(),
-    //     subject,
-    //     notes,
-    //     elapsedTime: seconds
-    //   });
-    // }
   };
 
   const handleStop = () => {
@@ -270,44 +245,32 @@ export default function Calendar() {
     setSubject("");
     setNotes("");
     setSessionStartTime(null);
-    
-    // TIMER FUNCTIONALITY COMMENTED OUT
-    // Stop background timer and clear state
-    // await stopBackgroundTimer();
-    // await clearTimerState();
   };
 
-  // Calendar helper functions
-  const generateTimeSlots = () => {
-    const slots = [];
-    for (let hour = 0; hour < 24; hour++) {
-      for (let minute = 0; minute < 60; minute += 30) { // Every 30 minutes
-        const startTime = new Date(selectedDate);
-        startTime.setHours(hour, minute, 0, 0);
-        
-        const endTime = new Date(selectedDate);
-        if (minute === 30) {
-          endTime.setHours(hour + 1, 0, 0, 0);
-        } else {
-          endTime.setHours(hour, 30, 0, 0);
-        }
-        
-        slots.push({
-          startTime,
-          endTime,
-          hour,
-          minute,
-          displayTime: startTime // For display purposes
-        });
+  // Generate hour markers for the timeline
+  const generateHourMarkers = () => {
+    const markers = [];
+    for (let hour = 0; hour <= 24; hour++) {
+      const hourDate = new Date(selectedDate);
+      if (hour === 24) {
+        // For 24:00 (midnight of next day), show as 12:00 AM
+        hourDate.setDate(hourDate.getDate() + 1);
+        hourDate.setHours(0, 0, 0, 0);
+      } else {
+        hourDate.setHours(hour, 0, 0, 0);
       }
+      const minutesFromDayStart = getMinutesFromDayStart(hourDate);
+      
+      markers.push({
+        hour,
+        top: minutesFromDayStart * pixelsPerMinute,
+        displayTime: hourDate
+      });
     }
-    return slots;
+    return markers;
   };
 
-  const timeSlots = generateTimeSlots();
-  const currentHour = currentTime.getHours();
-  const currentMinute = currentTime.getMinutes();
-  const currentTimeInMinutes = currentHour * 60 + currentMinute;
+  const hourMarkers = generateHourMarkers();
 
   const formatCalendarTime = (date: Date) => {
     return date.toLocaleTimeString('en-US', { 
@@ -326,66 +289,11 @@ export default function Calendar() {
     });
   };
 
-  const isCurrentTime = (slot: any) => {
-    const slotHour = slot.hour;
-    const slotMinute = slot.minute;
-    const slotTimeInMinutes = slotHour * 60 + slotMinute;
-    
-    // Check if current time falls within this 30-minute slot
+  const isCurrentTimeVisible = () => {
     const currentHour = currentTime.getHours();
     const currentMinute = currentTime.getMinutes();
-    const currentTimeInMinutes = currentHour * 60 + currentMinute;
-    
-    const isCurrent = currentTimeInMinutes >= slotTimeInMinutes && 
-           currentTimeInMinutes < slotTimeInMinutes + 30;
-    
-    // Debug logging for 4:30 slot specifically
-    if (slotHour === 16 && slotMinute === 30) {
-      console.log(`🔍 isCurrentTime debug for ${slotHour}:${slotMinute.toString().padStart(2, '0')}:`);
-      console.log(`   Current time: ${currentHour}:${currentMinute.toString().padStart(2, '0')} (${currentTimeInMinutes} minutes)`);
-      console.log(`   Slot time: ${slotHour}:${slotMinute.toString().padStart(2, '0')} (${slotTimeInMinutes} minutes)`);
-      console.log(`   Is current: ${isCurrent}`);
-      if (isCurrent) {
-        const minutesIntoSlot = currentTimeInMinutes - slotTimeInMinutes;
-        const expectedPosition = minutesIntoSlot * getPixelsPerMinute();
-        console.log(`   Minutes into slot: ${minutesIntoSlot}`);
-        console.log(`   Expected position: ${expectedPosition}px (should be ${(minutesIntoSlot/30*100).toFixed(1)}% through slot)`);
-      }
-    }
-    
-    return isCurrent;
-  };
-
-  // Dynamic positioning based on actual time slot height
-  const MINUTES_PER_SLOT = 30;
-  const ACTUAL_TIME_SLOT_HEIGHT = 60; // Use the actual time slot height from styles
-  const getPixelsPerMinute = () => ACTUAL_TIME_SLOT_HEIGHT / MINUTES_PER_SLOT;
-
-  const getCurrentTimePosition = (slot: any) => {
-    const slotHour = slot.hour;
-    const slotMinute = slot.minute;
-    const slotTimeInMinutes = slotHour * 60 + slotMinute;
-    
-    const currentHour = currentTime.getHours();
-    const currentMinute = currentTime.getMinutes();
-    const currentTimeInMinutes = currentHour * 60 + currentMinute;
-    
-    // Calculate how many minutes into the 30-minute slot the current time is
-    const minutesIntoSlot = currentTimeInMinutes - slotTimeInMinutes;
-    const topPosition = minutesIntoSlot * getPixelsPerMinute();
-    
-    console.log(`📍 Current time position: ${currentHour}:${currentMinute.toString().padStart(2, '0')} in slot ${slotHour}:${slotMinute.toString().padStart(2, '0')}`);
-    console.log(`   Minutes into slot: ${minutesIntoSlot}, Pixels per minute: ${getPixelsPerMinute()}, Top position: ${topPosition}px`);
-    
-    return topPosition;
-  };
-
-  const onTimeSlotLayout = (event: any) => {
-    const { height } = event.nativeEvent.layout;
-    console.log(`📏 Measured time slot height: ${height}px`);
-    if (height !== timeSlotHeight) {
-      setTimeSlotHeight(height);
-    }
+    const currentTimeInHours = currentHour + currentMinute / 60;
+    return currentTimeInHours >= DAY_START_HOUR && currentTimeInHours < DAY_END_HOUR;
   };
 
   const goToPreviousDay = () => {
@@ -399,7 +307,6 @@ export default function Calendar() {
     newDate.setDate(newDate.getDate() + 1);
     setSelectedDate(newDate);
   };
-
 
   const getStudySessions = async () => {
     try {
@@ -440,7 +347,6 @@ export default function Calendar() {
   };
 
   const [studySessions, setStudySessions] = useState<any[]>([]);
-  const [isSessionsExpanded, setIsSessionsExpanded] = useState(true);
 
   // Load sessions from Firebase when component mounts or date changes
   useEffect(() => {
@@ -466,83 +372,6 @@ export default function Calendar() {
       refreshSessions();
     }, [])
   );
-
-  // BACKGROUND TIMER FUNCTIONALITY COMMENTED OUT
-  // useEffect(() => {
-  //   const loadTimerFromStorage = async () => {
-  //     const restoredState = await restoreTimerState();
-  //     if (restoredState && restoredState.isRecording) {
-  //       // Restore timer state
-  //       setIsRecording(true);
-  //       setIsPaused(restoredState.isPaused || false);
-  //       setSubject(restoredState.subject || "");
-  //       setNotes(restoredState.notes || "");
-  //       setSessionStartTime(new Date(restoredState.startTime));
-        
-  //       // Use the calculated elapsed time
-  //       setSeconds(restoredState.elapsedTime || 0);
-        
-  //       console.log("Timer state restored from background:", {
-  //         isRecording: true,
-  //         elapsed: restoredState.elapsedTime,
-  //         subject: restoredState.subject
-  //       });
-  //     }
-  //   };
-
-  //   loadTimerFromStorage();
-  // }, []);
-
-  // APP STATE CHANGE HANDLER COMMENTED OUT (TIMER FUNCTIONALITY)
-  // useEffect(() => {
-  //   const handleAppStateChange = (nextAppState: string) => {
-  //     if (nextAppState === 'background' && isRecording) {
-  //       // Save timer state when going to background
-  //       saveTimerState({
-  //         isRecording,
-  //         isPaused,
-  //         startTime: sessionStartTime?.getTime(),
-  //         subject,
-  //         notes,
-  //         elapsedTime: seconds
-  //       });
-  //       console.log("Timer state saved for background");
-  //     } else if (nextAppState === 'active' && isRecording) {
-  //       // Restore timer when coming back to foreground
-  //       const restoreTimer = async () => {
-  //         const restoredState = await restoreTimerState();
-  //         if (restoredState && restoredState.isRecording) {
-  //           setSeconds(restoredState.elapsedTime);
-  //           console.log("Timer restored from background:", restoredState.elapsedTime, "seconds");
-  //         }
-  //       };
-  //       restoreTimer();
-  //     }
-  //   };
-
-  //   const subscription = AppState.addEventListener('change', handleAppStateChange);
-  //   return () => subscription?.remove();
-  // }, [isRecording, isPaused, sessionStartTime, subject, notes, seconds]);
-
-
-  const getSessionForTime = (hour: number, minute: number) => {
-    const timeInHours = hour + minute / 60;
-    
-    return studySessions.find(session => {
-      // Use the actual Firebase timestamps
-      const sessionStart = session.createdAt?.toDate ? session.createdAt.toDate() : new Date(session.createdAt);
-      const sessionEnd = session.updatedAt?.toDate ? session.updatedAt.toDate() : new Date(session.updatedAt);
-      
-      const startHour = sessionStart.getHours() + sessionStart.getMinutes() / 60;
-      const endHour = sessionEnd.getHours() + sessionEnd.getMinutes() / 60;
-      
-      // Session check
-      
-      return timeInHours >= startHour && timeInHours <= endHour;
-    });
-  };
-
-  const isToday = selectedDate.toDateString() === new Date().toDateString();
 
 
   return (
@@ -573,277 +402,126 @@ export default function Calendar() {
         <ScrollView
           ref={scrollViewRef}
           style={styles.scrollView}
-          contentContainerStyle={styles.scrollViewContent}
-          showsVerticalScrollIndicator={false}
+          contentContainerStyle={{ height: timelineHeight }}
+          showsVerticalScrollIndicator={true}
           contentInsetAdjustmentBehavior="never"
+          scrollEventThrottle={16}
+          bounces={true}
         >
-          {/* Time slots */}
-          {timeSlots.map((slot, index) => {
-            const hour = slot.hour;
-            const minute = slot.minute;
-            const session = getSessionForTime(hour, minute);
-            const isCurrent = isCurrentTime(slot) && isToday;
-            
-            // Debug current time detection
-            if (isToday && (hour === 15 || hour === 16)) {
-              console.log(`🕐 Time slot ${hour}:${minute.toString().padStart(2, '0')} - isCurrent: ${isCurrent}`);
-              if (isCurrent) {
-                console.log(`✅ Current time line should appear in slot ${hour}:${minute.toString().padStart(2, '0')}`);
-              }
-            }
-            
-            const isHalfHour = minute === 30;
-
-  return (
-              <View key={index} style={styles.timeSlot} onLayout={onTimeSlotLayout}>
-                {/* Time label */}
-                <View style={styles.timeLabel}>
-                  <Text style={[
-                    styles.timeText,
-                    isCurrent && styles.currentTimeText
-                  ]}>
-                    {formatCalendarTime(slot.displayTime)}
+          {/* Timeline Container */}
+          <View style={styles.timelineContainer}>
+            {/* Hour Markers */}
+            {hourMarkers.map((marker, index) => (
+              <View key={index} style={[styles.hourMarker, { top: marker.top }]}>
+                <View style={styles.hourLabel}>
+                  <Text style={styles.hourText}>
+                    {formatCalendarTime(marker.displayTime)}
                   </Text>
                 </View>
-
-                {/* Time line container */}
-                <View style={styles.timeLineContainer}>
-                  <View style={[
-                    styles.timeLine,
-                    isHalfHour && styles.halfHourLine
-                  ]} />
-                  
-                  {/* Current time indicator - only show on today */}
-                  {isCurrent && isToday && (
-                    <>
-                      {/* Time line at exact position */}
-                      <View style={[
-                        styles.currentTimeLine,
-                        { 
-                          backgroundColor: "#007AFF",
-                          position: 'absolute',
-                          top: getCurrentTimePosition(slot),
-                          left: 0,
-                          right: 0,
-                          height: 2,
-                          zIndex: 10 // Above session blocks
-                        }
-                      ]} />
-                      
-                      {/* Circle above the line */}
-                      <View style={[
-                        styles.currentTimeDot,
-                        { 
-                          backgroundColor: "#007AFF",
-                          position: 'absolute',
-                          top: getCurrentTimePosition(slot) - 4, // 4px above the line
-                          left: -4, // Center the circle
-                          zIndex: 10 // Above session blocks
-                        }
-                      ]} />
-                      
-                      {/* Time label */}
-                      <Text style={[
-                        styles.currentTimeLabel, 
-                        { 
-                          backgroundColor: "#007AFF",
-                          position: 'absolute',
-                          top: getCurrentTimePosition(slot) - 8,
-                          right: 10,
-                          zIndex: 10 // Above session blocks
-                        }
-                      ]}>
-                        {currentTime.toLocaleTimeString('en-US', { 
-                          hour: 'numeric', 
-                          minute: '2-digit',
-                          hour12: true 
-                        })}
-                      </Text>
-                    </>
-                  )}
-
-
-
-
-
-
-                  {/* Study session blocks - render based on start and end times */}
-                  {studySessions.map((session) => {
-                    // Get the formatted times to extract hours and minutes
-                    const startTimeFormatted = session.startTime ? formatFirebaseTime(session.startTime) : formatFirebaseTime(session.createdAt);
-                    const endTimeFormatted = session.endTime ? formatFirebaseTime(session.endTime) : formatFirebaseTime(session.updatedAt);
-                    
-                    // Extract start time
-                    const startHour = parseInt(startTimeFormatted.split(':')[0]);
-                    const startMinute = parseInt(startTimeFormatted.split(':')[1].split(' ')[0]);
-                    const startIsAM = startTimeFormatted.includes('AM');
-                    const adjustedStartHour = startIsAM ? (startHour === 12 ? 0 : startHour) : (startHour === 12 ? 12 : startHour + 12);
-                    
-                    // Extract end time
-                    const endHour = parseInt(endTimeFormatted.split(':')[0]);
-                    const endMinute = parseInt(endTimeFormatted.split(':')[1].split(' ')[0]);
-                    const endIsAM = endTimeFormatted.includes('AM');
-                    const adjustedEndHour = endIsAM ? (endHour === 12 ? 0 : endHour) : (endHour === 12 ? 12 : endHour + 12);
-                    
-                    console.log(`Session: ${session.subject}`);
-                    console.log(`Start: ${startTimeFormatted} (${adjustedStartHour}:${startMinute})`);
-                    console.log(`End: ${endTimeFormatted} (${adjustedEndHour}:${endMinute})`);
-                    console.log(`Current slot: ${hour}:${minute}`);
-                    
-                    // Check if this session overlaps with this time slot
-                    const sessionStartsInThisSlot = adjustedStartHour === hour && 
-                      (startMinute >= minute && startMinute < minute + 30);
-                    const sessionEndsInThisSlot = adjustedEndHour === hour && 
-                      (endMinute >= minute && endMinute < minute + 30);
-                    const sessionSpansThisSlot = adjustedStartHour < hour && adjustedEndHour > hour;
-                    const sessionContinuesFromPrevious = adjustedStartHour < hour && adjustedEndHour === hour && endMinute > minute;
-                    const sessionContinuesToNext = adjustedStartHour === hour && startMinute < minute + 30 && adjustedEndHour > hour;
-                    
-                    const sessionOverlapsSlot = sessionStartsInThisSlot || sessionEndsInThisSlot || sessionSpansThisSlot || 
-                      sessionContinuesFromPrevious || sessionContinuesToNext;
-                    
-                    if (!sessionOverlapsSlot) {
-                      return null;
-                    }
-                    
-                    // Calculate position and height within the slot
-                    let topPosition = 0;
-                    let height = 0;
-                    
-                    if (sessionStartsInThisSlot) {
-                      // Session starts in this slot
-                      topPosition = (startMinute - minute) * getPixelsPerMinute();
-                      if (sessionEndsInThisSlot) {
-                        // Session ends in this slot too
-                        height = (endMinute - startMinute) * getPixelsPerMinute();
-                      } else {
-                        // Session continues to next slot(s)
-                        height = (30 - (startMinute - minute)) * getPixelsPerMinute();
-                      }
-                    } else if (sessionEndsInThisSlot) {
-                      // Session ends in this slot
-                      topPosition = 0;
-                      height = (endMinute - minute) * getPixelsPerMinute();
-                    } else if (sessionSpansThisSlot || sessionContinuesFromPrevious || sessionContinuesToNext) {
-                      // Session spans the entire slot
-                      topPosition = 0;
-                      height = 30 * getPixelsPerMinute();
-                    }
-                    
-                    return (
-                      <View
-                        key={session.id}
-                        style={{
-                          position: 'absolute',
-                          left: 0,
-                          right: 0,
-                          top: topPosition,
-                          height: Math.max(height, 4), // Minimum 4px height
-                          backgroundColor: '#4A7C59', // Muted pastel green block
-                          zIndex: 10,
-                        }}
-                      />
-                    );
-                  })}
-
-
-                  {/* Study session blocks - only render at the start of each session */}
-                  {session && minute === 0 && (() => {
-                    const sessionStart = session.createdAt?.toDate ? session.createdAt.toDate() : new Date(session.createdAt);
-                    const sessionEnd = session.updatedAt?.toDate ? session.updatedAt.toDate() : new Date(session.updatedAt);
-                    
-                    // Calculate the duration and height
-                    const durationMs = sessionEnd.getTime() - sessionStart.getTime();
-                    const durationMinutes = durationMs / (1000 * 60);
-                    const heightInPixels = durationMinutes * getPixelsPerMinute();
-                    
-                    // Calculate position within the current time slot
-                    const slotStartTime = new Date(selectedDate);
-                    slotStartTime.setHours(hour, minute, 0, 0);
-                    const minutesIntoSlot = (sessionStart.getTime() - slotStartTime.getTime()) / (1000 * 60);
-                    const topPosition = minutesIntoSlot * getPixelsPerMinute();
-                    
-                    return (
-                      <View style={[
-                        styles.sessionBlock,
-                        {
-                          backgroundColor: session.color || "#2D5A27",
-                          height: heightInPixels, // Use actual calculated height
-                          top: topPosition, // Position based on exact start time
-                          left: 0,
-                          right: 0,
-                        }
-                      ]}>
-                        <Text style={styles.sessionText}>{session.subject}</Text>
-                        <Text style={styles.sessionTime}>
-                          {sessionStart.toLocaleTimeString('en-US', { 
-                            hour: 'numeric', 
-                            minute: '2-digit',
-                            hour12: true 
-                          })} - {sessionEnd.toLocaleTimeString('en-US', { 
-                            hour: 'numeric', 
-                            minute: '2-digit',
-                            hour12: true 
-                          })}
-                        </Text>
-                      </View>
-                    );
-                  })()}
-
-                  
-                </View>
+                <View style={styles.hourLine} />
               </View>
-            );
-          })}
+            ))}
+
+            {/* Study Session Blocks */}
+            {studySessions.map((session) => {
+              const position = getSessionPosition(session);
+              const sessionStart = session.startTime?.toDate ? session.startTime.toDate() : new Date(session.startTime);
+              const sessionEnd = session.endTime?.toDate ? session.endTime.toDate() : new Date(session.endTime);
+              
+              return (
+                <View
+                  key={session.id}
+                  style={{
+                    position: 'absolute',
+                    left: 80,
+                    right: 20,
+                    top: position.top,
+                    height: Math.max(position.height, 4), // Minimum 4px height for visibility
+                    backgroundColor: session.color || "#4A7C59",
+                    borderRadius: 4,
+                    padding: 4,
+                    zIndex: 10,
+                  }}
+                >
+                  <Text style={{ color: "white", fontSize: 12, fontWeight: "600" }}>
+                    {session.subject}
+                  </Text>
+                  <Text style={{ color: "white", fontSize: 10, opacity: 0.9 }}>
+                    {sessionStart.toLocaleTimeString('en-US', { 
+                      hour: 'numeric', 
+                      minute: '2-digit',
+                      hour12: true 
+                    })} - {sessionEnd.toLocaleTimeString('en-US', { 
+                      hour: 'numeric', 
+                      minute: '2-digit',
+                      hour12: true 
+                    })}
+                  </Text>
+                </View>
+              );
+            })}
+
+            {/* Current Time Indicator */}
+            {selectedDate.toDateString() === new Date().toDateString() && isCurrentTimeVisible() && (
+              <>
+                {/* Current time line */}
+                <View style={[
+                  styles.currentTimeLine,
+                  {
+                    position: 'absolute',
+                    left: 80,
+                    right: 20,
+                    top: getCurrentTimePosition(),
+                    height: 2,
+                    backgroundColor: "#007AFF",
+                    zIndex: 20,
+                  }
+                ]} />
+                
+                {/* Current time dot */}
+                <View style={[
+                  styles.currentTimeDot,
+                  {
+                    position: 'absolute',
+                    left: 76,
+                    top: getCurrentTimePosition() - 4,
+                    width: 8,
+                    height: 8,
+                    borderRadius: 4,
+                    backgroundColor: "#007AFF",
+                    zIndex: 20,
+                  }
+                ]} />
+                
+                {/* Current time label */}
+                <Text style={[
+                  styles.currentTimeLabel,
+                  {
+                    position: 'absolute',
+                    right: 20,
+                    top: getCurrentTimePosition() - 8,
+                    backgroundColor: "#007AFF",
+                    color: "white",
+                    fontSize: 12,
+                    fontWeight: "bold",
+                    paddingHorizontal: 6,
+                    paddingVertical: 2,
+                    borderRadius: 4,
+                    zIndex: 20,
+                  }
+                ]}>
+                  {currentTime.toLocaleTimeString('en-US', { 
+                    hour: 'numeric', 
+                    minute: '2-digit',
+                    hour12: true 
+                  })}
+                </Text>
+              </>
+            )}
+          </View>
         </ScrollView>
       </View>
 
-      {/* Fixed Today's Sessions Section */}
-      <View style={[
-        styles.fixedSessionsContainer,
-        !isSessionsExpanded && styles.fixedSessionsContainerCollapsed
-      ]}>
-        {/* Toggle Handle */}
-        <TouchableOpacity 
-          onPress={() => setIsSessionsExpanded(!isSessionsExpanded)}
-          style={styles.dragHandle}
-        >
-          <View style={styles.dragBar} />
-        </TouchableOpacity>
-
-        {/* Legend */}
-        <View style={styles.legend}>
-          <View style={styles.legendHeader}>
-            <Text style={styles.legendTitle}>
-              {isToday ? "Today's Sessions" : `${selectedDate.toLocaleDateString('en-US', { month: 'short', day: 'numeric' })} Sessions`}
-            </Text>
-          </View>
-          
-          {isSessionsExpanded && (
-            <ScrollView 
-              style={styles.sessionsScrollView}
-              showsVerticalScrollIndicator={true}
-              nestedScrollEnabled={true}
-            >
-              {studySessions.length > 0 ? (
-                studySessions.map((session, index) => (
-                  <View key={session.id || index} style={styles.legendItem}>
-                    <View style={[styles.legendColor, { backgroundColor: session.color || "#4A7C59" }]} />
-                    <View style={styles.legendContent}>
-                      <Text style={styles.legendText}>{session.subject}</Text>
-                      <Text style={styles.legendTime}>
-                        {session.startTime ? formatFirebaseTime(session.startTime) : formatFirebaseTime(session.createdAt)} - {session.endTime ? formatFirebaseTime(session.endTime) : formatFirebaseTime(session.updatedAt)}
-                      </Text>
-                    </View>
-                  </View>
-                ))
-              ) : (
-                <Text style={styles.noSessionsText}>No study sessions for this day</Text>
-              )}
-            </ScrollView>
-          )}
-        </View>
-      </View>
 
       {/* Record Modal */}
       <Modal
@@ -1015,86 +693,39 @@ const styles = StyleSheet.create({
   scrollViewContent: {
     paddingTop: 0,
     marginTop: 0,
+    flexGrow: 1,
   },
-  timeSlot: {
-    flexDirection: "row",
-    height: 60, // Fixed height for time slots
-    paddingHorizontal: 20,
-    position: 'relative', // Allow absolute positioning within time slots
-    marginTop: 0,
-    marginBottom: 0,
-    paddingTop: 0,
-    paddingBottom: 0,
-    justifyContent: "flex-start",
-    alignItems: "flex-start",
+  // Timeline styles
+  timelineContainer: {
+    position: 'relative',
+    height: '100%',
   },
-  timeLabel: {
+  hourMarker: {
+    position: 'absolute',
+    left: 0,
+    right: 0,
+    flexDirection: 'row',
+    alignItems: 'center',
+    height: 20, // Fixed height for each hour marker
+  },
+  hourLabel: {
     width: 80,
-    justifyContent: "flex-start",
-    alignItems: "flex-end",
-    paddingRight: 10,
-    paddingTop: 0,
-    transform: [{ translateY: -8 }], // Move time text up to overlap with border
+    paddingHorizontal: 10,
+    alignItems: 'flex-end',
   },
-  timeText: {
+  hourText: {
     fontSize: 14,
     color: "#666",
     fontWeight: "500",
   },
-  currentTimeText: {
-    color: "#2D5A27",
-    fontWeight: "bold",
-  },
-  timeLineContainer: {
+  hourLine: {
     flex: 1,
-    position: "relative",
-    justifyContent: "flex-start",
-    paddingTop: 0, // Position line at the very top to overlap with border
-  },
-  timeLine: {
-    height: 2,
-    backgroundColor: "#E5E5EA",
-    width: "100%",
-  },
-  halfHourLine: {
-    backgroundColor: "#D1D5DB",
     height: 1,
-  },
-  currentTimeLine: {
     backgroundColor: "#E5E5EA",
-    height: 3,
-  },
-  currentTimeIndicator: {
-    position: "absolute",
-    left: 0,
-    right: 0,
-    height: 2,
-    backgroundColor: "transparent",
-  },
-  currentTimeLabel: {
-    position: "absolute",
-    right: 10,
-    top: -8,
-    backgroundColor: "#007AFF",
-    color: "white",
-    fontSize: 12,
-    fontWeight: "bold",
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-    flexDirection: "row",
-    alignItems: "center",
-  },
-  currentTimeDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: "#2D5A27",
+    marginLeft: 10,
   },
   sessionBlock: {
-    position: "absolute",
-    left: 0,
-    right: 0,
+    position: 'absolute',
     padding: 8,
     borderRadius: 4,
     marginTop: 2,
@@ -1109,6 +740,22 @@ const styles = StyleSheet.create({
     color: "white",
     fontSize: 10,
     opacity: 0.9,
+  },
+  currentTimeLine: {
+    backgroundColor: "#007AFF",
+    height: 2,
+  },
+  currentTimeDot: {
+    backgroundColor: "#007AFF",
+  },
+  currentTimeLabel: {
+    backgroundColor: "#007AFF",
+    color: "white",
+    fontSize: 12,
+    fontWeight: "bold",
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
   },
   legend: {
     padding: 8,
@@ -1140,12 +787,6 @@ const styles = StyleSheet.create({
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-  },
-  debugText: {
-    fontSize: 10,
-    color: "#666",
-    marginBottom: 2,
-    fontFamily: "monospace",
   },
   legendColor: {
     width: 16,
@@ -1450,23 +1091,6 @@ const styles = StyleSheet.create({
     backgroundColor: "#FF3B30", // Red line
     zIndex: 10,
   },
-  fixedSessionsContainer: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: "#FFFFFF",
-    borderWidth: 1,
-    borderColor: "#D1D5DB",
-    borderBottomWidth: 0,
-    borderTopLeftRadius: 16,
-    borderTopRightRadius: 16,
-    maxHeight: 180, // Increased height to cover gray area
-  },
-  sessionsScrollView: {
-    maxHeight: 140, // Increased scrollable area to match container
-    paddingHorizontal: 12,
-  },
   betaContainer: {
     backgroundColor: "#007AFF",
     paddingVertical: 8,
@@ -1478,19 +1102,5 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#FFFFFF",
     letterSpacing: 1,
-  },
-  dragHandle: {
-    alignItems: "center",
-    paddingVertical: 4,
-    paddingTop: 8,
-  },
-  dragBar: {
-    width: 40,
-    height: 4,
-    backgroundColor: "#D1D5DB",
-    borderRadius: 2,
-  },
-  fixedSessionsContainerCollapsed: {
-    maxHeight: 60, // Smaller height when collapsed
   },
 });
