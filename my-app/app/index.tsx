@@ -519,13 +519,25 @@ export default function Index() {
             >
               <View style={styles.summaryHeader}>
                 <View style={styles.summaryUserInfo}>
-                  <Image 
-                    source={{ 
-                      uri: summary.userProfile?.profilePicture || 
-                      `https://via.placeholder.com/40x40/4A7C59/FFFFFF?text=${summary.userProfile?.displayName?.charAt(0) || 'U'}` 
-                    }} 
-                    style={styles.userAvatar} 
-                  />
+                  {summary.userProfile?.profilePicture ? (
+                    <Image 
+                      source={{ uri: summary.userProfile.profilePicture }} 
+                      style={styles.userAvatar} 
+                    />
+                  ) : (
+                    <View style={[styles.userAvatar, styles.userAvatarInitials]}>
+                      <Text style={styles.userAvatarText}>
+                        {(() => {
+                          const name = summary.userProfile?.displayName || 'User';
+                          const nameParts = name.split(' ');
+                          if (nameParts.length >= 2) {
+                            return (nameParts[0].charAt(0) + nameParts[nameParts.length - 1].charAt(0)).toUpperCase();
+                          }
+                          return name.charAt(0).toUpperCase();
+                        })()}
+                      </Text>
+                    </View>
+                  )}
                   <View style={styles.summaryInfo}>
                     <Text style={styles.summaryName}>
                       {summary.userProfile?.isOwn ? 'You' : summary.userProfile?.displayName}
@@ -1099,6 +1111,18 @@ const styles = StyleSheet.create({
     height: 40,
     borderRadius: 20,
     marginRight: 12,
+  },
+  userAvatarText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#666666",
+    textAlign: "center",
+    lineHeight: 40,
+  },
+  userAvatarInitials: {
+    backgroundColor: "#E5E5EA",
+    justifyContent: "center",
+    alignItems: "center",
   },
   // Action buttons container
   actionButtons: {

@@ -1,4 +1,4 @@
-import { Text, View, StyleSheet, Image, TouchableOpacity, ScrollView, Alert } from "react-native";
+import { Text, View, StyleSheet, Image, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
@@ -8,8 +8,11 @@ import { useAuth } from "../contexts/AuthContext";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/firebaseInit";
 import { getFollowCounts } from "../firebase/followService";
+import { generateSocialDailySummaries } from "../firebase/dailySummaryService";
 import { useFocusEffect } from '@react-navigation/native';
 import { navigateToStatistics, navigateToFollowers, navigateToFollowing } from "../utils/navigationUtils";
+import { useLikes } from "../hooks/useLikes";
+import LikersModal from "../components/LikersModal";
 import React from 'react';
 
 export default function Profile() {
@@ -23,16 +26,44 @@ export default function Profile() {
   const [streakDays, setStreakDays] = useState(0);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [followCounts, setFollowCounts] = useState({ followerCount: 0, followingCount: 0 });
+  const [userPosts, setUserPosts] = useState<any[]>([]);
+  const [postsLoading, setPostsLoading] = useState(true);
+  const [expandedPost, setExpandedPost] = useState<string | null>(null);
+  
+  // State for likers modal
+  const [likersModalVisible, setLikersModalVisible] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [selectedPostTitle, setSelectedPostTitle] = useState<string | null>(null);
+  
+  // Get post IDs for likes tracking
+  const postIds = userPosts.map(post => `${post.userId}-${post.date}`);
+  
+  // Likes functionality
+  const { 
+    toggleLikePost, 
+    isPostLiked, 
+    getPostLikeCount, 
+    refreshLikes,
+    loading: likesLoading,
+    error: likesError 
+  } = useLikes(postIds);
 
   useEffect(() => {
     const fetchData = async () => {
       try {
         setLoading(true);
+        setPostsLoading(true);
         
         // Fetch study sessions
         const sessions = await getStudySessions();
         setStudySessions(sessions);
         calculateStats(sessions);
+        
+        // Fetch user posts
+        if (user) {
+          const posts = await fetchUserPosts();
+          setUserPosts(posts);
+        }
         
         // Fetch user profile data
         if (user) {
@@ -49,9 +80,11 @@ export default function Profile() {
         }
         
         setLoading(false);
+        setPostsLoading(false);
       } catch (error) {
         console.error("Error fetching data:", error);
         setLoading(false);
+        setPostsLoading(false);
       }
     };
 
@@ -109,6 +142,35 @@ export default function Profile() {
     setStreakDays(uniqueDays.size);
   };
 
+  const fetchUserPosts = async () => {
+    try {
+      if (!user) return [];
+      
+      // Get social daily summaries (includes own posts)
+      const summaries = await generateSocialDailySummaries(30, user.uid);
+      
+      // Filter to only include own posts
+      const ownPosts = summaries.filter(summary => summary.userId === user.uid);
+      
+      return ownPosts;
+    } catch (error) {
+      console.error("Error fetching user posts:", error);
+      return [];
+    }
+  };
+
+  const handleShowLikers = (postId: string) => {
+    setSelectedPostId(postId);
+    setSelectedPostTitle(`Daily Summary - ${new Date().toLocaleDateString()}`);
+    setLikersModalVisible(true);
+  };
+
+  const handleCloseLikersModal = () => {
+    setLikersModalVisible(false);
+    setSelectedPostId(null);
+    setSelectedPostTitle(null);
+  };
+
   const formatTime = (hours: number) => {
     if (hours === 0) return "0h 0m";
     const wholeHours = Math.floor(hours);
@@ -124,6 +186,18 @@ export default function Profile() {
     // If 0 hours, just show minutes
     if (wholeHours === 0) {
       return `${minutes}m`;
+    }
+    
+    return `${wholeHours}h ${minutes}m`;
+  };
+
+  const formatTimeForDisplay = (hours: number) => {
+    if (hours === 0) return "0h 0m";
+    const wholeHours = Math.floor(hours);
+    const minutes = Math.round((hours - wholeHours) * 60);
+    
+    if (minutes === 0) {
+      return `${wholeHours}h`;
     }
     
     return `${wholeHours}h ${minutes}m`;
@@ -254,7 +328,10 @@ export default function Profile() {
             ) : (
               <View style={styles.profilePicture}>
                 <Text style={styles.profilePictureText}>
-                  {userProfile?.displayName?.split(' ').map(name => name.charAt(0)).join('').toUpperCase() || 'U'}
+                  {(() => {
+                    const initials = userProfile?.displayName?.split(' ').map((name: string) => name.charAt(0)).join('').toUpperCase();
+                    return initials || 'U';
+                  })()}
                 </Text>
               </View>
             )}
@@ -399,6 +476,175 @@ export default function Profile() {
           </View>
         )}
       </View>
+
+      {/* My Posts */}
+      <View style={styles.activityContainer}>
+        <Text style={styles.sectionTitle}>My Posts</Text>
+        {postsLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4A7C59" />
+            <Text style={styles.loadingText}>Loading your posts...</Text>
+          </View>
+        ) : userPosts.length > 0 ? (
+          userPosts.map((summary, index) => (
+            <View 
+              key={`${summary.userId}-${summary.date}`} 
+              style={styles.summaryCard}
+            >
+              <View style={styles.summaryHeader}>
+                <View style={styles.summaryUserInfo}>
+                  {summary.userProfile?.profilePicture ? (
+                    <Image 
+                      source={{ uri: summary.userProfile.profilePicture }} 
+                      style={styles.userAvatar} 
+                    />
+                  ) : (
+                    <View style={[styles.userAvatar, styles.userAvatarInitials]}>
+                      <Text style={styles.userAvatarText}>
+                        {(() => {
+                          const name = summary.userProfile?.displayName || 'User';
+                          const nameParts = name.split(' ');
+                          if (nameParts.length >= 2) {
+                            return (nameParts[0].charAt(0) + nameParts[nameParts.length - 1].charAt(0)).toUpperCase();
+                          }
+                          return name.charAt(0).toUpperCase();
+                        })()}
+                      </Text>
+                    </View>
+                  )}
+                  <View style={styles.summaryInfo}>
+                    <Text style={styles.summaryName}>
+                      You
+                    </Text>
+                    <Text style={styles.summaryTime}>
+                      {summary.date === new Date().toDateString() ? 'Today' : 
+                       summary.date === new Date(Date.now() - 24 * 60 * 60 * 1000).toDateString() ? 'Yesterday' :
+                       new Date(summary.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                    </Text>
+                  </View>
+                </View>
+                {summary.totalStudyTime > 0 && (
+                  <View style={styles.streakBadge}>
+                    <Ionicons name="flame" size={16} color="#FF6B35" />
+                    <Text style={styles.streakText}>{summary.sessionCount}</Text>
+                  </View>
+                )}
+              </View>
+              
+              {summary.totalStudyTime > 0 ? (
+                <>
+                  <View style={styles.summaryContent}>
+                    <Text style={styles.summaryTitle}>
+                      Studied for <Text style={styles.highlightText}>{formatTimeForDisplay(summary.totalStudyTime)}</Text> across <Text style={styles.highlightText}>{summary.sessionCount} sessions</Text>
+                    </Text>
+                    
+                    {summary.subjects.length > 0 && (
+                      <View style={styles.subjectsContainer}>
+                        <Text style={styles.subjectsLabel}>Subjects:</Text>
+                        <View style={styles.subjectsList}>
+                          {summary.subjects.map((subject: string, subjectIndex: number) => (
+                            <View key={subjectIndex} style={styles.subjectTag}>
+                              <Text style={styles.subjectTagText}>{subject}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {summary.longestSession > 0 && (
+                      <View style={styles.statsRow}>
+                        <Text style={styles.statLabel}>Longest session:</Text>
+                        <Text style={styles.statValue}>{formatTimeForDisplay(summary.longestSession)}</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.statsRow}>
+                      <Text style={styles.statLabel}>Most productive:</Text>
+                      <Text style={styles.statValue}>{summary.mostProductiveTime}</Text>
+                    </View>
+                  </View>
+
+                  {summary.insights && summary.insights.length > 0 && (
+                    <View style={styles.insightsContainer}>
+                      {summary.insights.map((insight: string, insightIndex: number) => (
+                        <Text key={insightIndex} style={styles.insightText}>
+                          💡 {insight}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Action Buttons */}
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={() => toggleLikePost(`${summary.userId}-${summary.date}`)}
+                      disabled={likesLoading}
+                    >
+                      <Ionicons 
+                        name={isPostLiked(`${summary.userId}-${summary.date}`) ? "heart" : "heart-outline"} 
+                        size={20} 
+                        color={isPostLiked(`${summary.userId}-${summary.date}`) ? "#FF3B30" : "#666"} 
+                      />
+                      <Text style={[
+                        styles.actionText,
+                        isPostLiked(`${summary.userId}-${summary.date}`) && styles.likedText
+                      ]}>
+                        Like
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.actionButton}>
+                      <Ionicons name="chatbubble-outline" size={20} color="#666" />
+                      <Text style={styles.actionText}>Comment</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.actionButton}>
+                      <Ionicons name="share-outline" size={20} color="#666" />
+                      <Text style={styles.actionText}>Share</Text>
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {/* Like Count */}
+                  {getPostLikeCount(`${summary.userId}-${summary.date}`) > 0 && (
+                    <TouchableOpacity 
+                      style={styles.likeCountContainer}
+                      onPress={() => handleShowLikers(`${summary.userId}-${summary.date}`)}
+                    >
+                      <Text style={styles.likeCountText}>
+                        {getPostLikeCount(`${summary.userId}-${summary.date}`)} Likes
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              ) : (
+                <View style={styles.noStudyContainer}>
+                  <Ionicons name="book-outline" size={32} color="#E5E5EA" />
+                  <Text style={styles.noStudyText}>No study time recorded</Text>
+                </View>
+              )}
+            </View>
+          ))
+        ) : (
+          <View style={styles.activityItem}>
+            <View style={styles.activityIcon}>
+              <Ionicons name="document-text" size={20} color="#34C759" />
+            </View>
+            <View style={styles.activityContent}>
+              <Text style={styles.activityText}>No posts yet</Text>
+              <Text style={styles.activityTime}>Complete study sessions to see your posts here!</Text>
+            </View>
+          </View>
+        )}
+      </View>
+      
+      {/* Likers Modal */}
+      <LikersModal
+        visible={likersModalVisible}
+        onClose={handleCloseLikersModal}
+        postId={selectedPostId || ''}
+        postTitle={selectedPostTitle || undefined}
+      />
     </ScrollView>
   );
 }
@@ -651,5 +897,188 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#FFFFFF",
     letterSpacing: 1,
+  },
+  // Home page post styles (copied from index.tsx)
+  summaryCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  summaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  summaryUserInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  userAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+  },
+  userAvatarText: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#666666",
+    textAlign: "center",
+    lineHeight: 40,
+  },
+  userAvatarInitials: {
+    backgroundColor: "#E5E5EA",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  summaryInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  summaryName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#000",
+    marginBottom: 2,
+  },
+  summaryTime: {
+    fontSize: 12,
+    color: "#999",
+  },
+  streakBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF4E6",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  streakText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#FF6B35",
+    marginLeft: 4,
+  },
+  summaryContent: {
+    marginBottom: 16,
+  },
+  summaryTitle: {
+    fontSize: 16,
+    color: "#333",
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  highlightText: {
+    fontWeight: "600",
+    color: "#4A7C59",
+  },
+  subjectsContainer: {
+    marginTop: 8,
+  },
+  subjectsLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#666",
+    marginBottom: 8,
+  },
+  subjectsList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  subjectTag: {
+    backgroundColor: "#F0F8F0",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E0F0E0",
+  },
+  subjectTagText: {
+    fontSize: 12,
+    color: "#4A7C59",
+    fontWeight: "500",
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  statValue: {
+    fontSize: 14,
+    color: "#333",
+    fontWeight: "600",
+  },
+  insightsContainer: {
+    marginTop: 12,
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+  },
+  insightText: {
+    fontSize: 14,
+    color: "#333",
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  noStudyContainer: {
+    alignItems: "center",
+    paddingVertical: 20,
+  },
+  noStudyText: {
+    fontSize: 14,
+    color: "#999",
+    marginTop: 8,
+  },
+  loadingContainer: {
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 20,
+  },
+  loadingText: {
+    fontSize: 14,
+    color: "#666",
+    marginTop: 8,
+  },
+  actionButtons: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+    marginTop: 12,
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  actionText: {
+    fontSize: 14,
+    color: "#666",
+    marginLeft: 6,
+    fontWeight: "500",
+  },
+  likedText: {
+    color: "#FF3B30",
+    fontWeight: "600",
+  },
+  likeCountContainer: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: "flex-start",
+  },
+  likeCountText: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
   },
 });
