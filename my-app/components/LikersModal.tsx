@@ -135,8 +135,6 @@ export default function LikersModal({ visible, onClose, postId, postTitle }: Lik
               {liker.user.displayName}
               {isCurrentUser && ' (You)'}
             </Text>
-            <Text style={styles.username}>@{liker.user.username}</Text>
-            <Text style={styles.likedTime}>{formatLikedTime(liker.likedAt)}</Text>
           </View>
         </View>
         <View style={styles.likeIndicator}>

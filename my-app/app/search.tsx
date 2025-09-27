@@ -3,6 +3,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
 import { useFocusEffect } from '@react-navigation/native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import React from 'react';
 import { collection, query, where, getDocs, orderBy, limit, addDoc, deleteDoc, doc } from "firebase/firestore";
 import { db } from "../firebase/firebaseInit";
@@ -14,6 +15,7 @@ import { ErrorBoundary } from "../components/ErrorBoundary";
 import { VirtualizedUserList } from "../components/VirtualizedUserList";
 
 export default function Search() {
+  const insets = useSafeAreaInsets();
   const router = useRouter();
   const { user: currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
@@ -143,11 +145,11 @@ export default function Search() {
   return (
     <ErrorBoundary>
       <View style={styles.container}>
-      <View style={styles.header}>
+      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
         <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Ionicons name="chevron-back" size={24} color="#2D5A27" />
+          <Ionicons name="arrow-back" size={24} color="#2D5A27" />
         </TouchableOpacity>
-        <Text style={styles.title}>Search People</Text>
+        <Text style={styles.title}>Search</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -203,8 +205,6 @@ const styles = StyleSheet.create({
     height: 40,
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 8,
-    backgroundColor: "#f0f0f0",
   },
   title: {
     fontSize: 20,
