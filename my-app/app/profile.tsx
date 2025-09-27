@@ -207,6 +207,7 @@ export default function Profile() {
     }));
   };
 
+
   const handleLogout = () => {
     Alert.alert(
       'Logout',
@@ -239,7 +240,9 @@ export default function Profile() {
         <View style={styles.profileSection}>
           <View style={styles.profilePictureContainer}>
             <Image
-              source={{ uri: "https://via.placeholder.com/120x120/007AFF/FFFFFF?text=U" }}
+              source={{ 
+                uri: userProfile?.profilePictureUrl || "https://via.placeholder.com/120x120/007AFF/FFFFFF?text=U" 
+              }}
               style={styles.profilePicture}
             />
           </View>
@@ -403,11 +406,9 @@ const styles = StyleSheet.create({
     marginBottom: 15,
   },
   profilePicture: {
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    borderWidth: 3,
-    borderColor: "#000000",
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
   name: {
     fontSize: 24,

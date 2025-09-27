@@ -1,14 +1,16 @@
-import { Text, View, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from "react-native";
+import { Text, View, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, updateDoc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase/firebaseInit";
+import * as ImagePicker from 'expo-image-picker';
+import { uploadProfilePicture } from "../firebase/profilePictureService";
 
 export default function EditProfile() {
   const router = useRouter();
-  const { user } = useAuth();
+  const { user, logout } = useAuth();
   
   // Form state
   const [firstName, setFirstName] = useState("");
@@ -18,6 +20,8 @@ export default function EditProfile() {
   const [bio, setBio] = useState("");
   const [loading, setLoading] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [profilePictureUrl, setProfilePictureUrl] = useState("");
+  const [uploading, setUploading] = useState(false);
 
   // Load user data on mount
   useEffect(() => {
@@ -35,6 +39,7 @@ export default function EditProfile() {
           setUsername(userData.username || user.email?.split('@')[0] || "");
           setSchool(userData.school || "");
           setBio(userData.bio || "");
+          setProfilePictureUrl(userData.profilePictureUrl || "");
         } else {
           // If no user document exists, create one with basic info
           setFirstName(user.displayName?.split(' ')[0] || "");
@@ -103,7 +108,7 @@ export default function EditProfile() {
       
     } catch (error) {
       console.error('❌ Error saving profile:', error);
-      Alert.alert("Error", `Failed to save profile: ${error.message || 'Unknown error'}`);
+      Alert.alert("Error", `Failed to save profile: ${error instanceof Error ? error.message : 'Unknown error'}`);
     } finally {
       setSaving(false);
     }
@@ -122,6 +127,77 @@ export default function EditProfile() {
         { text: "Discard", style: "destructive", onPress: () => router.push("/profile") }
       ]
     );
+  };
+
+  const handleImagePicker = () => {
+    Alert.alert(
+      'Select Profile Picture',
+      'Choose how you want to add a profile picture',
+      [
+        { text: 'Camera', onPress: () => pickImage('camera') },
+        { text: 'Photo Library', onPress: () => pickImage('library') },
+        { text: 'Cancel', style: 'cancel' }
+      ]
+    );
+  };
+
+  const pickImage = async (source: 'camera' | 'library') => {
+    try {
+      let result;
+      
+      if (source === 'camera') {
+        const permissionResult = await ImagePicker.requestCameraPermissionsAsync();
+        if (permissionResult.granted === false) {
+          Alert.alert('Permission Required', 'Camera permission is required to take photos');
+          return;
+        }
+        
+        result = await ImagePicker.launchCameraAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.6,
+          exif: false, // Remove EXIF data to reduce size
+        });
+      } else {
+        const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+        if (permissionResult.granted === false) {
+          Alert.alert('Permission Required', 'Photo library permission is required to select photos');
+          return;
+        }
+        
+        result = await ImagePicker.launchImageLibraryAsync({
+          mediaTypes: ImagePicker.MediaTypeOptions.Images,
+          allowsEditing: true,
+          aspect: [1, 1],
+          quality: 0.6,
+          exif: false, // Remove EXIF data to reduce size
+        });
+      }
+
+      if (!result.canceled && result.assets[0]) {
+        await uploadImage(result.assets[0].uri);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert('Error', 'Failed to pick image');
+    }
+  };
+
+  const uploadImage = async (imageUri: string) => {
+    if (!user) return;
+    
+    try {
+      setUploading(true);
+      const downloadURL = await uploadProfilePicture(user.uid, imageUri);
+      setProfilePictureUrl(downloadURL);
+      Alert.alert('Success', 'Profile picture updated successfully!');
+    } catch (error) {
+      console.error('Error uploading image:', error);
+      Alert.alert('Error', `Failed to upload profile picture: ${error instanceof Error ? error.message : 'Unknown error'}`);
+    } finally {
+      setUploading(false);
+    }
   };
 
   const handleLogout = () => {
@@ -170,18 +246,38 @@ export default function EditProfile() {
 
       {/* Profile Picture Section */}
       <View style={styles.profilePictureSection}>
-        <View style={styles.profilePictureContainer}>
-          <View style={styles.profilePicture}>
-            <Text style={styles.profilePictureText}>
-              {firstName.charAt(0).toUpperCase()}{lastName.charAt(0).toUpperCase()}
-            </Text>
-          </View>
-          <TouchableOpacity style={styles.editPictureButton}>
+        <TouchableOpacity 
+          style={styles.profilePictureContainer}
+          onPress={handleImagePicker}
+          disabled={uploading}
+        >
+          {uploading ? (
+            <View style={styles.profilePicture}>
+              <Ionicons name="cloud-upload" size={30} color="#666" />
+              <Text style={styles.uploadingText}>Uploading...</Text>
+            </View>
+          ) : profilePictureUrl ? (
+            <Image
+              source={{ uri: profilePictureUrl }}
+              style={styles.profilePicture}
+            />
+          ) : (
+            <View style={styles.profilePicture}>
+              <Text style={styles.profilePictureText}>
+                {firstName.charAt(0).toUpperCase()}{lastName.charAt(0).toUpperCase()}
+              </Text>
+            </View>
+          )}
+          <TouchableOpacity 
+            style={styles.editPictureButton}
+            onPress={handleImagePicker}
+            disabled={uploading}
+          >
             <Ionicons name="camera" size={20} color="#2D5A27" />
           </TouchableOpacity>
-        </View>
+        </TouchableOpacity>
         <Text style={styles.profilePictureLabel}>Profile Picture</Text>
-        <Text style={styles.profilePictureSubtext}>Tap to change (coming soon)</Text>
+        <Text style={styles.profilePictureSubtext}>Tap to change</Text>
       </View>
 
       {/* Form Fields */}
@@ -410,6 +506,11 @@ const styles = StyleSheet.create({
   profilePictureSubtext: {
     fontSize: 14,
     color: "#666",
+  },
+  uploadingText: {
+    fontSize: 12,
+    color: "#666",
+    marginTop: 4,
   },
   formContainer: {
     backgroundColor: "#ffffff",
