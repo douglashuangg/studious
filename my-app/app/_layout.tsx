@@ -124,6 +124,12 @@ export default function RootLayout() {
           tabBarStyle: { display: 'none' }, // Completely hide tab bar
         }}
       />
+      <Tabs.Screen
+        name="notifications"
+        options={{
+          href: null, // Hide from tab bar
+        }}
+      />
     </Tabs>
         </AuthWrapper>
       </AuthProvider>

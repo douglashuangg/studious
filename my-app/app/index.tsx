@@ -340,6 +340,21 @@ export default function Index() {
         </View>
       </View>
 
+      {/* Top Header with Notifications */}
+      <View style={styles.topHeader}>
+        <View style={styles.topHeaderLeft}>
+          <Text style={styles.appTitle}>Studious</Text>
+        </View>
+        <View style={styles.topHeaderRight}>
+          <TouchableOpacity 
+            style={styles.topNotificationButton}
+            onPress={() => router.push("/notifications")}
+          >
+            <Ionicons name="notifications-outline" size={24} color="#4A7C59" />
+          </TouchableOpacity>
+        </View>
+      </View>
+
       {/* Stories Section */}
       <View style={styles.storiesContainer}>
         <Text style={styles.storiesTitle}>Currently Studying</Text>
@@ -526,7 +541,7 @@ const styles = StyleSheet.create({
     backgroundColor: "#ffffff",
     paddingVertical: 16,
     paddingHorizontal: 20,
-    marginTop: 10,
+    marginTop: 0,
   },
   storiesTitle: {
     fontSize: 18,
@@ -865,5 +880,30 @@ const styles = StyleSheet.create({
     fontWeight: "bold",
     color: "#FFFFFF",
     letterSpacing: 1,
+  },
+  topHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingHorizontal: 20,
+    paddingVertical: 15,
+    backgroundColor: "#ffffff",
+    borderBottomWidth: 1,
+    borderBottomColor: "#E5E5EA",
+  },
+  topHeaderLeft: {
+    flex: 1,
+  },
+  appTitle: {
+    fontSize: 24,
+    fontWeight: "bold",
+    color: "#000",
+  },
+  topHeaderRight: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  topNotificationButton: {
+    padding: 8,
   },
 });

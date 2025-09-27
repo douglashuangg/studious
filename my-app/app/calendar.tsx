@@ -32,6 +32,7 @@ export default function Calendar() {
   const DAY_START_HOUR = 0; // 12:00 AM (midnight)
   const DAY_END_HOUR = 24; // 12:00 AM (midnight) - next day
   const TOTAL_MINUTES = (DAY_END_HOUR - DAY_START_HOUR) * 60; // 24 hours = 1440 minutes
+  const TIMELINE_PADDING = 15; // Padding to ensure 12:00 AM marker is visible
 
   // Calculate pixels per minute based on screen size
   useEffect(() => {
@@ -39,7 +40,7 @@ export default function Calendar() {
     const fixedPixelsPerMinute = 2; // 2px per minute = 2880px for 24 hours
     setPixelsPerMinute(fixedPixelsPerMinute);
     // Add minimal padding to ensure the 12:00 AM marker is visible above navbar
-    setTimelineHeight(TOTAL_MINUTES * fixedPixelsPerMinute + 20);
+    setTimelineHeight(TOTAL_MINUTES * fixedPixelsPerMinute + TIMELINE_PADDING);
   }, []);
 
   // Calendar time update
