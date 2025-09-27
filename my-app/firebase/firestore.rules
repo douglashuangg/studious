@@ -20,6 +20,15 @@ service cloud.firestore {
       allow read, write: if request.auth != null && 
         request.auth.uid == resource.data.userId;
     }
+    
+    // Likes - users can create/delete their own likes, read all likes
+    match /likes/{likeId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+      allow delete: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+    }
   }
 }
 

@@ -8,8 +8,10 @@ import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { db } from "../firebase/firebaseInit";
 import { useAuth } from "../contexts/AuthContext";
 import { useCurrentlyStudying } from "../hooks/useCurrentlyStudying";
+import { useLikes } from "../hooks/useLikes";
 import { formatCurrentlyStudyingForHomePage } from "../utils/currentlyStudyingUtils";
 import { generateSocialDailySummaries } from "../firebase/dailySummaryService.js";
+import LikersModal from "../components/LikersModal";
 
 export default function Index() {
   const insets = useSafeAreaInsets();
@@ -35,8 +37,23 @@ export default function Index() {
   const [dailySummaries, setDailySummaries] = useState<any[]>([]);
   const [summariesLoading, setSummariesLoading] = useState(true);
   
-  // State for likes
-  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
+  // State for likers modal
+  const [likersModalVisible, setLikersModalVisible] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [selectedPostTitle, setSelectedPostTitle] = useState<string | null>(null);
+  
+  // Get post IDs for likes tracking
+  const postIds = dailySummaries.map(summary => `${summary.userId}-${summary.date}`);
+  
+  // Likes functionality
+  const { 
+    toggleLikePost, 
+    isPostLiked, 
+    getPostLikeCount, 
+    refreshLikes,
+    loading: likesLoading,
+    error: likesError 
+  } = useLikes(postIds);
 
   // Load user's study data from Firebase
   useEffect(() => {
@@ -224,16 +241,24 @@ export default function Index() {
     console.log("Comment on activity:", activityId);
   };
 
-  const handleLike = (postId: string) => {
-    setLikedPosts(prev => {
-      const newLikedPosts = new Set(prev);
-      if (newLikedPosts.has(postId)) {
-        newLikedPosts.delete(postId);
-      } else {
-        newLikedPosts.add(postId);
-      }
-      return newLikedPosts;
-    });
+  const handleLike = async (postId: string) => {
+    try {
+      await toggleLikePost(postId);
+    } catch (error) {
+      console.error('Error toggling like:', error);
+    }
+  };
+
+  const handleShowLikers = (postId: string, postTitle?: string) => {
+    setSelectedPostId(postId);
+    setSelectedPostTitle(postTitle || null);
+    setLikersModalVisible(true);
+  };
+
+  const handleCloseLikersModal = () => {
+    setLikersModalVisible(false);
+    setSelectedPostId(null);
+    setSelectedPostTitle(null);
   };
 
   const onRefresh = async () => {
@@ -329,7 +354,7 @@ export default function Index() {
         }
       };
 
-      await Promise.all([loadUserStats(), loadDailySummaries()]);
+      await Promise.all([loadUserStats(), loadDailySummaries(), refreshLikes()]);
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
@@ -339,7 +364,8 @@ export default function Index() {
 
   return (
     <ScrollView 
-      style={styles.container} 
+      style={styles.container}
+      contentInsetAdjustmentBehavior="automatic"
       showsVerticalScrollIndicator={false}
       refreshControl={
         <RefreshControl
@@ -354,7 +380,7 @@ export default function Index() {
       }
     >
       {/* Alpha Badge */}
-      <View style={[styles.betaContainer, { marginTop: insets.top }]}>
+      <View style={styles.betaContainer}>
         <View style={styles.betaBadge}>
           <Text style={styles.betaText}>ALPHA v0.1.0</Text>
         </View>
@@ -462,9 +488,6 @@ export default function Index() {
           <TouchableOpacity style={styles.searchButton} onPress={() => router.push("/search")}>
             <Ionicons name="search" size={20} color="#4A7C59" />
           </TouchableOpacity>
-          <TouchableOpacity style={styles.refreshButton}>
-            <Ionicons name="refresh" size={20} color="#4A7C59" />
-          </TouchableOpacity>
         </View>
       </View>
 
@@ -507,9 +530,6 @@ export default function Index() {
                   <View style={styles.summaryInfo}>
                     <Text style={styles.summaryName}>
                       {summary.userProfile?.isOwn ? 'You' : summary.userProfile?.displayName}
-                    </Text>
-                    <Text style={styles.summaryUsername}>
-                      @{summary.userProfile?.username}
                     </Text>
                     <Text style={styles.summaryTime}>
                       {summary.date === new Date().toDateString() ? 'Today' : 
@@ -574,15 +594,16 @@ export default function Index() {
                     <TouchableOpacity 
                       style={styles.actionButton}
                       onPress={() => handleLike(`${summary.userId}-${summary.date}`)}
+                      disabled={likesLoading}
                     >
                       <Ionicons 
-                        name={likedPosts.has(`${summary.userId}-${summary.date}`) ? "heart" : "heart-outline"} 
+                        name={isPostLiked(`${summary.userId}-${summary.date}`) ? "heart" : "heart-outline"} 
                         size={20} 
-                        color={likedPosts.has(`${summary.userId}-${summary.date}`) ? "#FF3B30" : "#666"} 
+                        color={isPostLiked(`${summary.userId}-${summary.date}`) ? "#FF3B30" : "#666"} 
                       />
                       <Text style={[
                         styles.actionText,
-                        likedPosts.has(`${summary.userId}-${summary.date}`) && styles.likedText
+                        isPostLiked(`${summary.userId}-${summary.date}`) && styles.likedText
                       ]}>
                         Like
                       </Text>
@@ -598,6 +619,20 @@ export default function Index() {
                       <Text style={styles.actionText}>Share</Text>
                     </TouchableOpacity>
                   </View>
+                  
+                  {/* Like Count */}
+                  {getPostLikeCount(`${summary.userId}-${summary.date}`) > 0 && (
+                    <TouchableOpacity 
+                      style={styles.likeCountContainer}
+                      onPress={() => handleShowLikers(
+                        `${summary.userId}-${summary.date}`
+                      )}
+                    >
+                      <Text style={styles.likeCountText}>
+                        {getPostLikeCount(`${summary.userId}-${summary.date}`)} Likes
+                      </Text>
+                    </TouchableOpacity>
+                  )}
                 </>
               ) : (
                 <View style={styles.noStudyContainer}>
@@ -609,6 +644,14 @@ export default function Index() {
           ))
         )}
       </View>
+      
+      {/* Likers Modal */}
+      <LikersModal
+        visible={likersModalVisible}
+        onClose={handleCloseLikersModal}
+        postId={selectedPostId || ''}
+        postTitle={selectedPostTitle || undefined}
+      />
     </ScrollView>
   );
 }
@@ -757,11 +800,6 @@ const styles = StyleSheet.create({
     gap: 8,
   },
   searchButton: {
-    padding: 8,
-    backgroundColor: "#f0f0f0",
-    borderRadius: 8,
-  },
-  refreshButton: {
     padding: 8,
     backgroundColor: "#f0f0f0",
     borderRadius: 8,
@@ -1071,5 +1109,16 @@ const styles = StyleSheet.create({
     borderTopWidth: 1,
     borderTopColor: "#F0F0F0",
     marginTop: 12,
+  },
+  // Like count container
+  likeCountContainer: {
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    alignItems: "flex-start",
+  },
+  likeCountText: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
   },
 });
