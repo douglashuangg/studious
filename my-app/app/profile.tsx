@@ -113,8 +113,16 @@ export default function Profile() {
   };
 
   const formatTime = (hours: number) => {
+    if (hours === 0) return "0h 0m";
     const wholeHours = Math.floor(hours);
     const minutes = Math.round((hours - wholeHours) * 60);
+    
+    // Handle case where minutes might be 60 or more
+    if (minutes >= 60) {
+      const additionalHours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      return `${wholeHours + additionalHours}h ${remainingMinutes}m`;
+    }
     
     // If 0 hours, just show minutes
     if (wholeHours === 0) {
@@ -291,7 +299,7 @@ export default function Profile() {
       <View style={styles.statsContainer}>
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>
-            {loading ? "..." : totalStudyHours.toFixed(1)}
+            {loading ? "..." : formatTime(totalStudyHours)}
           </Text>
           <Text style={styles.statLabel}>Study Hours</Text>
         </View>

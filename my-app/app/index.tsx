@@ -9,6 +9,7 @@ import { db } from "../firebase/firebaseInit";
 import { useAuth } from "../contexts/AuthContext";
 import { useCurrentlyStudying } from "../hooks/useCurrentlyStudying";
 import { formatCurrentlyStudyingForHomePage } from "../utils/currentlyStudyingUtils";
+import { generateSocialDailySummaries } from "../firebase/dailySummaryService.js";
 
 export default function Index() {
   const insets = useSafeAreaInsets();
@@ -29,6 +30,13 @@ export default function Index() {
   const [totalHours, setTotalHours] = useState(0);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
+  
+  // State for daily summaries
+  const [dailySummaries, setDailySummaries] = useState<any[]>([]);
+  const [summariesLoading, setSummariesLoading] = useState(true);
+  
+  // State for likes
+  const [likedPosts, setLikedPosts] = useState<Set<string>>(new Set());
 
   // Load user's study data from Firebase
   useEffect(() => {
@@ -99,7 +107,25 @@ export default function Index() {
       }
     };
 
+    const loadDailySummaries = async () => {
+      if (!user) {
+        setSummariesLoading(false);
+        return;
+      }
+
+      try {
+        setSummariesLoading(true);
+        const summaries = await generateSocialDailySummaries(7, user.uid);
+        setDailySummaries(summaries);
+      } catch (error) {
+        console.error('Error loading social daily summaries:', error);
+      } finally {
+        setSummariesLoading(false);
+      }
+    };
+
     loadUserStats();
+    loadDailySummaries();
   }, [user]);
 
   // Calculate study streak
@@ -132,8 +158,17 @@ export default function Index() {
 
   // Format time duration
   const formatTime = (hours: number) => {
+    if (hours === 0) return "0h 0m";
     const wholeHours = Math.floor(hours);
     const minutes = Math.round((hours - wholeHours) * 60);
+    
+    // Handle case where minutes might be 60 or more
+    if (minutes >= 60) {
+      const additionalHours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      return `${wholeHours + additionalHours}h ${remainingMinutes}m`;
+    }
+    
     return `${wholeHours}h ${minutes}m`;
   };
   
@@ -155,83 +190,50 @@ export default function Index() {
           }
         ];
   
-  // Mock data for daily study summaries
-  const dailySummaries = [
-    {
-      id: 1,
-      name: "Sarah Johnson",
-      username: "@sarahj",
-      avatar: "https://via.placeholder.com/50x50/FF6B6B/FFFFFF?text=S",
-      totalTime: "4h 30m",
-      sessionCount: 3,
-      subjects: ["Mathematics", "Physics", "Chemistry"],
-      time: "Yesterday",
-      likes: 12,
-      isLiked: false,
-      streak: 7,
-    },
-    {
-      id: 2,
-      name: "Mike Chen",
-      username: "@mikechen",
-      avatar: "https://via.placeholder.com/50x50/4ECDC4/FFFFFF?text=M",
-      totalTime: "6h 15m",
-      sessionCount: 4,
-      subjects: ["Programming", "Data Science", "Algorithms"],
-      time: "Yesterday",
-      likes: 8,
-      isLiked: true,
-      streak: 12,
-    },
-    {
-      id: 3,
-      name: "Emma Wilson",
-      username: "@emmaw",
-      avatar: "https://via.placeholder.com/50x50/45B7D1/FFFFFF?text=E",
-      totalTime: "3h 45m",
-      sessionCount: 2,
-      subjects: ["Physics", "Calculus"],
-      time: "Yesterday",
-      likes: 15,
-      isLiked: false,
-      streak: 5,
-    },
-    {
-      id: 4,
-      name: "Alex Rodriguez",
-      username: "@alexr",
-      avatar: "https://via.placeholder.com/50x50/96CEB4/FFFFFF?text=A",
-      totalTime: "5h 20m",
-      sessionCount: 3,
-      subjects: ["Chemistry", "Organic Chemistry", "Lab Work"],
-      time: "2 days ago",
-      likes: 6,
-      isLiked: false,
-      streak: 3,
-    },
-    {
-      id: 5,
-      name: "Lisa Park",
-      username: "@lisap",
-      avatar: "https://via.placeholder.com/50x50/FFEAA7/FFFFFF?text=L",
-      totalTime: "7h 10m",
-      sessionCount: 5,
-      subjects: ["Biology", "Anatomy", "Genetics", "Ecology", "Research"],
-      time: "2 days ago",
-      likes: 23,
-      isLiked: true,
-      streak: 15,
-    },
-  ];
+  // Helper function to format time for display
+  const formatTimeForDisplay = (hours: number) => {
+    if (hours === 0) return "0h 0m";
+    const wholeHours = Math.floor(hours);
+    const minutes = Math.round((hours - wholeHours) * 60);
+    
+    // Handle case where minutes might be 60 or more
+    if (minutes >= 60) {
+      const additionalHours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      return `${wholeHours + additionalHours}h ${remainingMinutes}m`;
+    }
+    
+    return `${wholeHours}h ${minutes}m`;
+  };
 
-  const handleLike = (activityId: string) => {
-    // Handle like functionality
-    console.log("Liked activity:", activityId);
+  // Helper function to get relative time
+  const getRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
   };
 
   const handleComment = (activityId: string) => {
     // Handle comment functionality
     console.log("Comment on activity:", activityId);
+  };
+
+  const handleLike = (postId: string) => {
+    setLikedPosts(prev => {
+      const newLikedPosts = new Set(prev);
+      if (newLikedPosts.has(postId)) {
+        newLikedPosts.delete(postId);
+      } else {
+        newLikedPosts.add(postId);
+      }
+      return newLikedPosts;
+    });
   };
 
   const onRefresh = async () => {
@@ -309,7 +311,25 @@ export default function Index() {
         }
       };
 
-      await loadUserStats();
+      // Refresh daily summaries
+      const loadDailySummaries = async () => {
+        if (!user) {
+          setSummariesLoading(false);
+          return;
+        }
+
+        try {
+          setSummariesLoading(true);
+          const summaries = await generateSocialDailySummaries(7, user.uid);
+          setDailySummaries(summaries);
+        } catch (error) {
+          console.error('Error loading social daily summaries:', error);
+        } finally {
+          setSummariesLoading(false);
+        }
+      };
+
+      await Promise.all([loadUserStats(), loadDailySummaries()]);
     } catch (error) {
       console.error('Error refreshing data:', error);
     } finally {
@@ -429,7 +449,7 @@ export default function Index() {
         <View style={styles.statDivider} />
         <View style={styles.statItem}>
           <Text style={styles.statNumber}>
-            {loading ? "..." : totalHours.toFixed(1)}
+            {loading ? "..." : formatTime(totalHours)}
           </Text>
           <Text style={styles.statLabel}>Total Hours</Text>
         </View>
@@ -450,71 +470,144 @@ export default function Index() {
 
       {/* Daily Summary Feed */}
       <View style={styles.feedContainer}>
-        {dailySummaries.map((summary) => (
-          <View key={summary.id} style={styles.summaryCard}>
-            <TouchableOpacity 
-              style={styles.summaryHeader}
-              onPress={() => router.push(`/user-profile/external-user-profile?id=${summary.id}`)}
-            >
-              <Image source={{ uri: summary.avatar }} style={styles.avatar} />
-              <View style={styles.summaryInfo}>
-                <Text style={styles.summaryName}>{summary.name}</Text>
-                <Text style={styles.summaryUsername}>{summary.username}</Text>
-                <Text style={styles.summaryTime}>{summary.time}</Text>
-              </View>
-              <View style={styles.streakBadge}>
-                <Ionicons name="flame" size={16} color="#FF6B35" />
-                <Text style={styles.streakText}>{summary.streak}</Text>
-              </View>
-            </TouchableOpacity>
-            
-            <View style={styles.summaryContent}>
-              <Text style={styles.summaryTitle}>
-                Studied for <Text style={styles.highlightText}>{summary.totalTime}</Text> across <Text style={styles.highlightText}>{summary.sessionCount} sessions</Text>
-              </Text>
-              
-              <View style={styles.subjectsContainer}>
-                <Text style={styles.subjectsLabel}>Subjects:</Text>
-                <View style={styles.subjectsList}>
-                  {summary.subjects.map((subject, index) => (
-                    <View key={index} style={styles.subjectTag}>
-                      <Text style={styles.subjectTagText}>{subject}</Text>
-                    </View>
-                  ))}
-                </View>
-              </View>
-            </View>
-
-            <View style={styles.summaryActions}>
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={() => handleLike(summary.id.toString())}
-              >
-                <Ionicons 
-                  name={summary.isLiked ? "heart" : "heart-outline"} 
-                  size={20} 
-                  color={summary.isLiked ? "#FF3B30" : "#666"} 
-                />
-                <Text style={[styles.actionText, summary.isLiked && styles.likedText]}>
-                  {summary.likes}
-                </Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity 
-                style={styles.actionButton}
-                onPress={() => handleComment(summary.id.toString())}
-              >
-                <Ionicons name="chatbubble-outline" size={20} color="#666" />
-                <Text style={styles.actionText}>Comment</Text>
-              </TouchableOpacity>
-              
-              <TouchableOpacity style={styles.actionButton}>
-                <Ionicons name="share-outline" size={20} color="#666" />
-                <Text style={styles.actionText}>Share</Text>
-              </TouchableOpacity>
-            </View>
+        {summariesLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color="#4A7C59" />
+            <Text style={styles.loadingText}>Loading your study summaries...</Text>
           </View>
-        ))}
+        ) : dailySummaries.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <Ionicons name="book-outline" size={48} color="#E5E5EA" />
+            <Text style={styles.emptyTitle}>No study data yet</Text>
+            <Text style={styles.emptyMessage}>
+              Start studying to see your daily summaries here!
+            </Text>
+          </View>
+        ) : (
+          dailySummaries.map((summary, index) => (
+            <TouchableOpacity 
+              key={`${summary.userId}-${summary.date}`} 
+              style={styles.summaryCard}
+              activeOpacity={1}
+              onPress={() => {
+                if (!summary.userProfile?.isOwn) {
+                  router.push(`/user-profile/external-user-profile?id=${summary.userId}`);
+                }
+              }}
+            >
+              <View style={styles.summaryHeader}>
+                <View style={styles.summaryUserInfo}>
+                  <Image 
+                    source={{ 
+                      uri: summary.userProfile?.profilePicture || 
+                      `https://via.placeholder.com/40x40/4A7C59/FFFFFF?text=${summary.userProfile?.displayName?.charAt(0) || 'U'}` 
+                    }} 
+                    style={styles.userAvatar} 
+                  />
+                  <View style={styles.summaryInfo}>
+                    <Text style={styles.summaryName}>
+                      {summary.userProfile?.isOwn ? 'You' : summary.userProfile?.displayName}
+                    </Text>
+                    <Text style={styles.summaryUsername}>
+                      @{summary.userProfile?.username}
+                    </Text>
+                    <Text style={styles.summaryTime}>
+                      {summary.date === new Date().toDateString() ? 'Today' : 
+                       summary.date === new Date(Date.now() - 24 * 60 * 60 * 1000).toDateString() ? 'Yesterday' :
+                       new Date(summary.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
+                    </Text>
+                  </View>
+                </View>
+                {summary.totalStudyTime > 0 && (
+                  <View style={styles.streakBadge}>
+                    <Ionicons name="flame" size={16} color="#FF6B35" />
+                    <Text style={styles.streakText}>{summary.sessionCount}</Text>
+                  </View>
+                )}
+              </View>
+              
+              {summary.totalStudyTime > 0 ? (
+                <>
+                  <View style={styles.summaryContent}>
+                    <Text style={styles.summaryTitle}>
+                      Studied for <Text style={styles.highlightText}>{formatTimeForDisplay(summary.totalStudyTime)}</Text> across <Text style={styles.highlightText}>{summary.sessionCount} sessions</Text>
+                    </Text>
+                    
+                    {summary.subjects.length > 0 && (
+                      <View style={styles.subjectsContainer}>
+                        <Text style={styles.subjectsLabel}>Subjects:</Text>
+                        <View style={styles.subjectsList}>
+                          {summary.subjects.map((subject: string, subjectIndex: number) => (
+                            <View key={subjectIndex} style={styles.subjectTag}>
+                              <Text style={styles.subjectTagText}>{subject}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {summary.longestSession > 0 && (
+                      <View style={styles.statsRow}>
+                        <Text style={styles.statLabel}>Longest session:</Text>
+                        <Text style={styles.statValue}>{formatTimeForDisplay(summary.longestSession)}</Text>
+                      </View>
+                    )}
+
+                    <View style={styles.statsRow}>
+                      <Text style={styles.statLabel}>Most productive:</Text>
+                      <Text style={styles.statValue}>{summary.mostProductiveTime}</Text>
+                    </View>
+                  </View>
+
+                  {summary.insights && summary.insights.length > 0 && (
+                    <View style={styles.insightsContainer}>
+                      {summary.insights.map((insight: string, insightIndex: number) => (
+                        <Text key={insightIndex} style={styles.insightText}>
+                          💡 {insight}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Action Buttons */}
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={() => handleLike(`${summary.userId}-${summary.date}`)}
+                    >
+                      <Ionicons 
+                        name={likedPosts.has(`${summary.userId}-${summary.date}`) ? "heart" : "heart-outline"} 
+                        size={20} 
+                        color={likedPosts.has(`${summary.userId}-${summary.date}`) ? "#FF3B30" : "#666"} 
+                      />
+                      <Text style={[
+                        styles.actionText,
+                        likedPosts.has(`${summary.userId}-${summary.date}`) && styles.likedText
+                      ]}>
+                        Like
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.actionButton}>
+                      <Ionicons name="chatbubble-outline" size={20} color="#666" />
+                      <Text style={styles.actionText}>Comment</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.actionButton}>
+                      <Ionicons name="share-outline" size={20} color="#666" />
+                      <Text style={styles.actionText}>Share</Text>
+                    </TouchableOpacity>
+                  </View>
+                </>
+              ) : (
+                <View style={styles.noStudyContainer}>
+                  <Ionicons name="book-outline" size={32} color="#E5E5EA" />
+                  <Text style={styles.noStudyText}>No study time recorded</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))
+        )}
       </View>
     </ScrollView>
   );
@@ -905,5 +998,78 @@ const styles = StyleSheet.create({
   },
   topNotificationButton: {
     padding: 8,
+  },
+  // Additional styles for real daily summaries
+  emptyContainer: {
+    alignItems: "center",
+    paddingVertical: 40,
+    paddingHorizontal: 20,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontWeight: "600",
+    color: "#000",
+    marginTop: 12,
+    marginBottom: 8,
+  },
+  emptyMessage: {
+    fontSize: 14,
+    color: "#666",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginTop: 8,
+    paddingVertical: 4,
+  },
+  statValue: {
+    fontSize: 14,
+    color: "#000",
+    fontWeight: "600",
+  },
+  insightsContainer: {
+    backgroundColor: "#F0F8F0",
+    borderRadius: 8,
+    padding: 12,
+    marginTop: 12,
+  },
+  insightText: {
+    fontSize: 14,
+    color: "#4A7C59",
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  noStudyContainer: {
+    alignItems: "center",
+    paddingVertical: 20,
+  },
+  noStudyText: {
+    fontSize: 14,
+    color: "#999",
+    marginTop: 8,
+  },
+  // Social feed styles
+  summaryUserInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  userAvatar: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    marginRight: 12,
+  },
+  // Action buttons container
+  actionButtons: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+    marginTop: 12,
   },
 });
