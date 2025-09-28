@@ -1,16 +1,19 @@
-import { Text, View, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView } from "react-native";
+import { Text, View, StyleSheet, TouchableOpacity, Alert, ActivityIndicator, ScrollView, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useRouter } from "expo-router";
 import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase/firebaseInit";
+import * as ImagePicker from 'expo-image-picker';
 
 export default function SetupProfilePicture() {
   const router = useRouter();
   const { user } = useAuth();
   
   const [loading, setLoading] = useState(false);
+  const [hasProfilePicture, setHasProfilePicture] = useState(false);
+  const [profileImageUri, setProfileImageUri] = useState<string | null>(null);
 
   const handleSkip = () => {
     Alert.alert(
@@ -23,14 +26,32 @@ export default function SetupProfilePicture() {
     );
   };
 
-  const handleAddPicture = () => {
-    Alert.alert(
-      "Add Profile Picture",
-      "This feature will be available soon! For now, you can skip and add a picture later.",
-      [
-        { text: "OK", onPress: () => {} }
-      ]
-    );
+  const handleAddPicture = async () => {
+    try {
+      // Request permission to access media library
+      const permissionResult = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      
+      if (permissionResult.granted === false) {
+        Alert.alert("Permission Required", "Please grant permission to access your photo library.");
+        return;
+      }
+
+      // Launch image picker
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        aspect: [1, 1],
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets[0]) {
+        setProfileImageUri(result.assets[0].uri);
+        setHasProfilePicture(true);
+      }
+    } catch (error) {
+      console.error('Error picking image:', error);
+      Alert.alert("Error", "Failed to pick image. Please try again.");
+    }
   };
 
   const handleComplete = async () => {
@@ -38,10 +59,17 @@ export default function SetupProfilePicture() {
       setLoading(true);
       
       // Update user document to mark profile picture setup as complete
-      await updateDoc(doc(db, 'users', user!.uid), {
+      const updateData: any = {
         profilePictureSetup: true,
         updatedAt: new Date()
-      });
+      };
+
+      // If a profile picture was selected, save the URI
+      if (profileImageUri) {
+        updateData.profilePictureUrl = profileImageUri;
+      }
+
+      await updateDoc(doc(db, 'users', user!.uid), updateData);
       
       router.replace("/");
       
@@ -72,13 +100,17 @@ export default function SetupProfilePicture() {
       <View style={styles.profilePictureSection}>
         <View style={styles.profilePictureContainer}>
           <View style={styles.profilePicture}>
-            <Ionicons name="camera" size={40} color="#2D5A27" />
+            {profileImageUri ? (
+              <Image source={{ uri: profileImageUri }} style={styles.profileImage} />
+            ) : (
+              <Ionicons name="camera" size={40} color="#000000" />
+            )}
           </View>
           <TouchableOpacity 
             style={styles.addPictureButton}
             onPress={handleAddPicture}
           >
-            <Ionicons name="camera" size={20} color="#2D5A27" />
+            <Ionicons name="camera" size={20} color="#000000" />
             <Text style={styles.addPictureButtonText}>Add Photo</Text>
           </TouchableOpacity>
         </View>
@@ -103,9 +135,9 @@ export default function SetupProfilePicture() {
         </TouchableOpacity>
         
         <TouchableOpacity 
-          style={[styles.completeButton, loading && styles.completeButtonDisabled]}
+          style={[styles.completeButton, (loading || !hasProfilePicture) && styles.completeButtonDisabled]}
           onPress={handleComplete}
-          disabled={loading}
+          disabled={loading || !hasProfilePicture}
         >
           {loading ? (
             <ActivityIndicator size="small" color="#FFFFFF" />
@@ -144,7 +176,7 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#2D5A27",
+    color: "#000000",
     marginBottom: 8,
   },
   welcomeSubtitle: {
@@ -177,18 +209,18 @@ const styles = StyleSheet.create({
   addPictureButton: {
     flexDirection: "row",
     alignItems: "center",
-    backgroundColor: "#f8f9fa",
+    backgroundColor: "#FFFFFF",
     paddingHorizontal: 20,
     paddingVertical: 12,
     borderRadius: 8,
     borderWidth: 1,
-    borderColor: "#2D5A27",
+    borderColor: "#000000",
   },
   addPictureButtonText: {
     marginLeft: 8,
     fontSize: 16,
     fontWeight: "600",
-    color: "#2D5A27",
+    color: "#000000",
   },
   profilePictureLabel: {
     fontSize: 18,
@@ -230,7 +262,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 8,
     alignItems: "center",
-    backgroundColor: "#2D5A27",
+    backgroundColor: "#5A8A4A",
   },
   completeButtonDisabled: {
     backgroundColor: "#999",
@@ -239,5 +271,10 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontWeight: "600",
     color: "#FFFFFF",
+  },
+  profileImage: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
   },
 });

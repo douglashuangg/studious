@@ -79,12 +79,11 @@ export default function SetupProfile() {
         <View style={styles.formContainer}>
           {/* First Name */}
           <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>First Name *</Text>
             <TextInput
               style={styles.textInput}
               value={firstName}
               onChangeText={setFirstName}
-              placeholder="Enter your first name"
+              placeholder="First name"
               placeholderTextColor="#999"
               maxLength={50}
             />
@@ -92,12 +91,11 @@ export default function SetupProfile() {
 
           {/* Last Name */}
           <View style={styles.fieldContainer}>
-            <Text style={styles.fieldLabel}>Last Name *</Text>
             <TextInput
               style={styles.textInput}
               value={lastName}
               onChangeText={setLastName}
-              placeholder="Enter your last name"
+              placeholder="Last name"
               placeholderTextColor="#999"
               maxLength={50}
             />
