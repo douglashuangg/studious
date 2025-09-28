@@ -197,6 +197,13 @@ export const generateSocialDailySummaries = async (days = 7, userId = null) => {
           date.setDate(date.getDate() - i);
           const dateKey = date.toDateString();
           
+          // Only generate posts for completed days (not today)
+          // Skip today since it hasn't been completed yet
+          const isToday = i === 0;
+          if (isToday) {
+            continue; // Skip today - posts only generate after midnight
+          }
+          
           const daySessions = sessionsByUserAndDate[targetUserId]?.[dateKey] || [];
           
           if (daySessions.length > 0) {
