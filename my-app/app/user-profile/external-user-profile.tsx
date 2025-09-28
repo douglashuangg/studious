@@ -8,6 +8,9 @@ import { db } from "../../firebase/firebaseInit";
 import { useAuth } from "../../contexts/AuthContext";
 import { followUser, unfollowUser, isFollowing as checkIsFollowing, getFollowers, getFollowing } from "../../firebase/followService";
 import { navigateBack } from "../../utils/navigationUtils";
+import { generateRecentDailySummaries } from "../../firebase/dailySummaryService.js";
+import { useLikes } from "../../hooks/useLikes";
+import LikersModal from "../../components/LikersModal";
 import React from 'react';
 
 export default function ExternalUserProfile() {
@@ -22,6 +25,11 @@ export default function ExternalUserProfile() {
   const [following, setFollowing] = useState<any[]>([]);
   const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
+  const [dailyPosts, setDailyPosts] = useState<any[]>([]);
+  const [postsLoading, setPostsLoading] = useState(false);
+  const [likersModalVisible, setLikersModalVisible] = useState(false);
+  const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
+  const [selectedPostTitle, setSelectedPostTitle] = useState<string | null>(null);
   const [stats, setStats] = useState({
     studyHours: 0,
     sessions: 0,
@@ -115,6 +123,37 @@ export default function ExternalUserProfile() {
 
     loadUserData();
   }, [id, currentUser]);
+
+  // Load user's daily posts - optimized for single user
+  useEffect(() => {
+    const loadDailyPosts = async () => {
+      if (!id) return;
+      
+      try {
+        setPostsLoading(true);
+        // Use the optimized single-user function instead of social summaries
+        const posts = await generateRecentDailySummaries(7, id as string);
+        setDailyPosts(posts);
+      } catch (error) {
+        console.error('Error loading daily posts:', error);
+      } finally {
+        setPostsLoading(false);
+      }
+    };
+
+    loadDailyPosts();
+  }, [id]);
+
+  // Get post IDs for likes functionality
+  const postIds = dailyPosts.map(post => `${post.userId}-${post.date}`);
+  
+  // Initialize likes hook
+  const {
+    toggleLikePost,
+    isPostLiked,
+    getPostLikeCount,
+    loading: likesLoading
+  } = useLikes(postIds);
 
   // Calculate study streak
   const calculateStreak = (sessions: any[]) => {
@@ -225,6 +264,56 @@ export default function ExternalUserProfile() {
     const wholeHours = Math.floor(hours);
     const minutes = Math.round((hours - wholeHours) * 60);
     return `${wholeHours}h ${minutes}m`;
+  };
+
+  // Helper function to format time for display (same as home page)
+  const formatTimeForDisplay = (hours: number) => {
+    if (hours === 0) return "0h 0m";
+    const wholeHours = Math.floor(hours);
+    const minutes = Math.round((hours - wholeHours) * 60);
+    
+    // Handle case where minutes might be 60 or more
+    if (minutes >= 60) {
+      const additionalHours = Math.floor(minutes / 60);
+      const remainingMinutes = minutes % 60;
+      return `${wholeHours + additionalHours}h ${remainingMinutes}m`;
+    }
+    
+    return `${wholeHours}h ${minutes}m`;
+  };
+
+  // Helper function to get relative time (same as home page)
+  const getRelativeTime = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffTime = now.getTime() - date.getTime();
+    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+    
+    if (diffDays === 0) return "Today";
+    if (diffDays === 1) return "Yesterday";
+    if (diffDays < 7) return `${diffDays} days ago`;
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // Like handlers (same as home page)
+  const handleLike = async (postId: string) => {
+    try {
+      await toggleLikePost(postId);
+    } catch (error) {
+      console.error('Error toggling like:', error);
+    }
+  };
+
+  const handleShowLikers = (postId: string, postTitle?: string) => {
+    setSelectedPostId(postId);
+    setSelectedPostTitle(postTitle || null);
+    setLikersModalVisible(true);
+  };
+
+  const handleCloseLikersModal = () => {
+    setLikersModalVisible(false);
+    setSelectedPostId(null);
+    setSelectedPostTitle(null);
   };
 
   if (loading) {
@@ -338,45 +427,177 @@ export default function ExternalUserProfile() {
         </View>
       )}
 
-      {/* Recent Activity */}
-      <View style={styles.activityContainer}>
-        <Text style={styles.sectionTitle}>Recent Activity</Text>
-        {studySessions.length > 0 ? (
-          studySessions.slice(0, 5).map((session, index) => {
-            const sessionDate = session.createdAt?.toDate ? session.createdAt.toDate() : new Date(session.createdAt);
-            const timeAgo = getTimeAgo(sessionDate);
-            
-            let sessionDuration = 0;
-            if (session.startTime && session.endTime) {
-              const start = session.startTime?.toDate ? session.startTime.toDate() : new Date(session.startTime);
-              const end = session.endTime?.toDate ? session.endTime.toDate() : new Date(session.endTime);
-              const durationMs = end.getTime() - start.getTime();
-              sessionDuration = durationMs / (1000 * 60 * 60); // Convert to hours
-            } else if (session.duration) {
-              sessionDuration = session.duration / 3600; // Convert seconds to hours
-            }
-            
-            return (
-              <View key={session.id || index} style={styles.activityItem}>
-                <View style={styles.activityIcon}>
-                  <Ionicons name="book" size={20} color="#2D5A27" />
+
+      {/* Daily Posts Section */}
+      <View style={styles.dailyPostsContainer}>
+        <Text style={styles.sectionTitle}>Daily Study Posts</Text>
+        {postsLoading ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="small" color="#2D5A27" />
+            <Text style={styles.loadingText}>Loading posts...</Text>
+          </View>
+        ) : dailyPosts.length > 0 ? (
+          dailyPosts.map((summary, index) => (
+            <TouchableOpacity 
+              key={`${summary.userId}-${summary.date}`} 
+              style={styles.summaryCard}
+              activeOpacity={1}
+            >
+              <View style={styles.summaryHeader}>
+                <View style={styles.summaryUserInfo}>
+                  {user.profilePictureUrl ? (
+                    <Image 
+                      source={{ uri: user.profilePictureUrl }} 
+                      style={styles.userAvatar} 
+                    />
+                  ) : (
+                    <View style={[styles.userAvatar, styles.userAvatarInitials]}>
+                      <Text style={styles.userAvatarText}>
+                        {(() => {
+                          const name = user.displayName || 'User';
+                          const nameParts = name.split(' ');
+                          if (nameParts.length >= 2) {
+                            return (nameParts[0].charAt(0) + nameParts[nameParts.length - 1].charAt(0)).toUpperCase();
+                          }
+                          return name.charAt(0).toUpperCase();
+                        })()}
+                      </Text>
                 </View>
-                <View style={styles.activityContent}>
-                  <Text style={styles.activityText}>
-                    Studied {session.subject || 'Unknown Subject'} for {formatTime(sessionDuration)}
+                  )}
+                  <View style={styles.summaryInfo}>
+                    <Text style={styles.summaryName}>
+                      {user.displayName || 'Anonymous User'}
+                    </Text>
+                    <Text style={styles.summaryTime}>
+                      {summary.date === new Date().toDateString() ? 'Today' : 
+                       summary.date === new Date(Date.now() - 24 * 60 * 60 * 1000).toDateString() ? 'Yesterday' :
+                       new Date(summary.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                   </Text>
-                  <Text style={styles.activityTime}>{timeAgo}</Text>
+                  </View>
                 </View>
+                {summary.totalStudyTime > 0 && (
+                  <View style={styles.streakBadge}>
+                    <Ionicons name="flame" size={16} color="#FF6B35" />
+                    <Text style={styles.streakText}>{summary.sessionCount}</Text>
+                  </View>
+                )}
               </View>
-            );
-          })
+              
+              {summary.totalStudyTime > 0 ? (
+                <>
+                  <View style={styles.summaryContent}>
+                    <Text style={styles.summaryTitle}>
+                      Studied for <Text style={styles.highlightText}>{formatTimeForDisplay(summary.totalStudyTime)}</Text> across <Text style={styles.highlightText}>{summary.sessionCount} sessions</Text>
+                    </Text>
+                    
+                    {summary.subjects.length > 0 && (
+                      <View style={styles.subjectsContainer}>
+                        <Text style={styles.subjectsLabel}>Subjects:</Text>
+                        <View style={styles.subjectsList}>
+                          {summary.subjects.map((subject: string, subjectIndex: number) => (
+                            <View key={subjectIndex} style={styles.subjectTag}>
+                              <Text style={styles.subjectTagText}>{subject}</Text>
+                            </View>
+                          ))}
+                        </View>
+                      </View>
+                    )}
+
+                    {summary.longestSession > 0 && (
+                      <View style={styles.statsRow}>
+                        <Text style={styles.statLabel}>Longest session:</Text>
+                        <Text style={styles.statValue}>{formatTimeForDisplay(summary.longestSession)}</Text>
+                      </View>
+                    )}
+
+
+                    <View style={styles.statsRow}>
+                      <Text style={styles.statLabel}>Most productive:</Text>
+                      <Text style={styles.statValue}>{summary.mostProductiveTime}</Text>
+                    </View>
+                  </View>
+
+                  {summary.insights && summary.insights.length > 0 && (
+                    <View style={styles.insightsContainer}>
+                      {summary.insights.map((insight: string, insightIndex: number) => (
+                        <Text key={insightIndex} style={styles.insightText}>
+                          💡 {insight}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Action Buttons */}
+                  <View style={styles.actionButtons}>
+                    <TouchableOpacity 
+                      style={styles.actionButton}
+                      onPress={() => handleLike(`${summary.userId}-${summary.date}`)}
+                      disabled={likesLoading}
+                    >
+                      <Ionicons 
+                        name={isPostLiked(`${summary.userId}-${summary.date}`) ? "heart" : "heart-outline"} 
+                        size={20} 
+                        color={isPostLiked(`${summary.userId}-${summary.date}`) ? "#FF3B30" : "#666"} 
+                      />
+                      <Text style={[
+                        styles.actionText,
+                        isPostLiked(`${summary.userId}-${summary.date}`) && styles.likedText
+                      ]}>
+                        Like
+                      </Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.actionButton}>
+                      <Ionicons name="chatbubble-outline" size={20} color="#666" />
+                      <Text style={styles.actionText}>Comment</Text>
+                    </TouchableOpacity>
+                    
+                    <TouchableOpacity style={styles.actionButton}>
+                      <Ionicons name="share-outline" size={20} color="#666" />
+                      <Text style={styles.actionText}>Share</Text>
+                    </TouchableOpacity>
+                  </View>
+                  
+                  {/* Like Count */}
+                  {getPostLikeCount(`${summary.userId}-${summary.date}`) > 0 && (
+                    <TouchableOpacity 
+                      style={styles.likeCountContainer}
+                      onPress={() => handleShowLikers(
+                        `${summary.userId}-${summary.date}`
+                      )}
+                    >
+                      <Text style={styles.likeCountText}>
+                        {getPostLikeCount(`${summary.userId}-${summary.date}`)} Likes
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </>
+              ) : (
+                <View style={styles.noStudyContainer}>
+                  <Ionicons name="book-outline" size={32} color="#E5E5EA" />
+                  <Text style={styles.noStudyText}>No study time recorded</Text>
+                </View>
+              )}
+            </TouchableOpacity>
+          ))
         ) : (
-          <View style={styles.noActivityContainer}>
-            <Text style={styles.noActivityText}>No study sessions yet</Text>
-            <Text style={styles.noActivitySubtext}>This user hasn't started studying</Text>
+          <View style={styles.emptyContainer}>
+            <Ionicons name="book-outline" size={48} color="#E5E5EA" />
+            <Text style={styles.emptyTitle}>No study data yet</Text>
+            <Text style={styles.emptyMessage}>
+              This user hasn't shared any study summaries yet!
+            </Text>
           </View>
         )}
       </View>
+      
+      {/* Likers Modal */}
+      <LikersModal
+        visible={likersModalVisible}
+        onClose={handleCloseLikersModal}
+        postId={selectedPostId || ''}
+        postTitle={selectedPostTitle || undefined}
+      />
     </ScrollView>
   );
 }
@@ -614,5 +835,196 @@ const styles = StyleSheet.create({
   noActivitySubtext: {
     fontSize: 14,
     color: "#999",
+  },
+  dailyPostsContainer: {
+    marginHorizontal: 20,
+    marginTop: 20,
+    marginBottom: 30,
+  },
+  summaryCard: {
+    backgroundColor: "#ffffff",
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  summaryHeader: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 16,
+  },
+  summaryUserInfo: {
+    flexDirection: "row",
+    alignItems: "center",
+    flex: 1,
+  },
+  summaryInfo: {
+    flex: 1,
+    marginLeft: 12,
+  },
+  summaryName: {
+    fontSize: 16,
+    fontWeight: "600",
+    color: "#000",
+    marginBottom: 2,
+  },
+  summaryTime: {
+    fontSize: 12,
+    color: "#999",
+  },
+  streakBadge: {
+    flexDirection: "row",
+    alignItems: "center",
+    backgroundColor: "#FFF4E6",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 12,
+  },
+  streakText: {
+    fontSize: 12,
+    fontWeight: "600",
+    color: "#FF6B35",
+    marginLeft: 4,
+  },
+  summaryContent: {
+    marginBottom: 16,
+  },
+  summaryTitle: {
+    fontSize: 16,
+    color: "#333",
+    lineHeight: 22,
+    marginBottom: 12,
+  },
+  highlightText: {
+    fontWeight: "600",
+    color: "#4A7C59",
+  },
+  subjectsContainer: {
+    marginTop: 8,
+  },
+  subjectsLabel: {
+    fontSize: 14,
+    fontWeight: "500",
+    color: "#666",
+    marginBottom: 8,
+  },
+  subjectsList: {
+    flexDirection: "row",
+    flexWrap: "wrap",
+    gap: 6,
+  },
+  subjectTag: {
+    backgroundColor: "#F0F8F0",
+    paddingHorizontal: 8,
+    paddingVertical: 4,
+    borderRadius: 8,
+    borderWidth: 1,
+    borderColor: "#E0F0E0",
+  },
+  subjectTagText: {
+    fontSize: 12,
+    color: "#4A7C59",
+    fontWeight: "500",
+  },
+  statsRow: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    marginBottom: 8,
+  },
+  statLabel: {
+    fontSize: 14,
+    color: "#666",
+  },
+  statValue: {
+    fontSize: 14,
+    fontWeight: "600",
+    color: "#4A7C59",
+  },
+  insightsContainer: {
+    marginTop: 12,
+    padding: 12,
+    backgroundColor: "#F8F9FA",
+    borderRadius: 8,
+  },
+  insightText: {
+    fontSize: 14,
+    color: "#333",
+    lineHeight: 20,
+    marginBottom: 4,
+  },
+  actionButtons: {
+    flexDirection: "row",
+    justifyContent: "space-around",
+    paddingTop: 12,
+    borderTopWidth: 1,
+    borderTopColor: "#F0F0F0",
+  },
+  actionButton: {
+    flexDirection: "row",
+    alignItems: "center",
+    paddingVertical: 8,
+    paddingHorizontal: 12,
+  },
+  actionText: {
+    fontSize: 14,
+    color: "#666",
+    marginLeft: 6,
+  },
+  likedText: {
+    color: "#FF3B30",
+  },
+  likeCountContainer: {
+    paddingTop: 8,
+    paddingHorizontal: 4,
+  },
+  likeCountText: {
+    fontSize: 14,
+    color: "#666",
+    fontWeight: "500",
+  },
+  noStudyContainer: {
+    alignItems: "center",
+    paddingVertical: 20,
+  },
+  noStudyText: {
+    fontSize: 14,
+    color: "#999",
+    marginTop: 8,
+  },
+  emptyContainer: {
+    alignItems: "center",
+    paddingVertical: 40,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    color: "#666",
+    marginTop: 12,
+    marginBottom: 4,
+  },
+  emptyMessage: {
+    fontSize: 14,
+    color: "#999",
+    textAlign: "center",
+    lineHeight: 20,
+  },
+  userAvatar: {
+    width: 50,
+    height: 50,
+    borderRadius: 25,
+  },
+  userAvatarInitials: {
+    backgroundColor: "#E5E5EA",
+    justifyContent: "center",
+    alignItems: "center",
+  },
+  userAvatarText: {
+    fontSize: 20,
+    fontWeight: "600",
+    color: "#666",
   },
 });
