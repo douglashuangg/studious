@@ -10,10 +10,22 @@
     "newArchEnabled": true,
     "ios": {
       "supportsTablet": true,
+      "bundleIdentifier": "com.anonymous.myapp.studious",
+      "buildNumber": "1",
+      "googleServicesFile": "./GoogleService-Info.plist",
       "backgroundModes": [
         "background-fetch",
+        "fetch",
+        "background-fetch",
         "fetch"
-      ]
+      ],
+      "infoPlist": {
+        "ITSAppUsesNonExemptEncryption": false
+      },
+      "podfileProperties": {
+        "use_modular_headers": true,
+        "use_frameworks": true
+      }
     },
     "android": {
       "adaptiveIcon": {
@@ -50,11 +62,27 @@
         }
       ],
       "@react-native-firebase/app",
+      [
+        "expo-build-properties",
+        {
+          "ios": {
+            "useFrameworks": "static",
+            "swiftVersion": "5.0",
+            "buildReactNativeFromSource": true
+          }
+        }
+      ],
       "expo-background-fetch"
     ],
     "experiments": {
       "typedRoutes": true,
       "reactCompiler": true
+    },
+    "extra": {
+      "router": {},
+      "eas": {
+        "projectId": "2356d0e3-2678-4dbd-bdeb-8840025f2358"
+      }
     }
   }
 }
