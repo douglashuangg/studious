@@ -1,11 +1,11 @@
 import { Text, View, StyleSheet, ScrollView, TouchableOpacity, Image } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useNavigation } from '@react-navigation/native';
 
 export default function Notifications() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const navigation = useNavigation();
 
   // No notifications for now
   const notifications: any[] = [];
@@ -42,17 +42,6 @@ export default function Notifications() {
 
   return (
     <View style={styles.container}>
-      {/* Header */}
-      <View style={[styles.header, { paddingTop: insets.top }]}>
-        <TouchableOpacity 
-          onPress={() => router.back()}
-          style={styles.backButton}
-        >
-          <Ionicons name="chevron-back" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Notifications</Text>
-        <View style={styles.placeholder} />
-      </View>
 
       {/* Empty State (if no notifications) */}
       {notifications.length === 0 ? (

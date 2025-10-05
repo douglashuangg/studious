@@ -1,7 +1,7 @@
 import { Text, View, StyleSheet, Image, TouchableOpacity, ScrollView, Alert, ActivityIndicator } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useNavigation } from '@react-navigation/native';
 import { useState, useEffect } from "react";
 import { getStudySessions } from "../firebase/studySessionService";
 import { useAuth } from "../contexts/AuthContext";
@@ -10,14 +10,13 @@ import { db } from "../firebase/firebaseInit";
 import { getFollowCounts } from "../firebase/followService";
 import { generateSocialDailySummaries } from "../firebase/dailySummaryService";
 import { useFocusEffect } from '@react-navigation/native';
-import { navigateToStatistics, navigateToFollowers, navigateToFollowing } from "../utils/navigationUtils";
 import { useLikes } from "../hooks/useLikes";
 import LikersModal from "../components/LikersModal";
 import React from 'react';
 
 export default function Profile() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const navigation = useNavigation();
   const { user, logout } = useAuth();
   const [studySessions, setStudySessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
@@ -312,7 +311,7 @@ export default function Profile() {
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
       {/* Alpha Header */}
-      <View style={[styles.betaContainer, { marginTop: insets.top }]}>
+      <View style={styles.betaContainer}>
         <Text style={styles.betaText}>ALPHA v0.1.0</Text>
       </View>
 
@@ -338,11 +337,11 @@ export default function Profile() {
           </View>
           
           <View style={styles.followContainer}>
-            <TouchableOpacity style={styles.followItem} onPress={() => user?.uid && navigateToFollowers(user.uid, 'profile')}>
+            <TouchableOpacity style={styles.followItem} onPress={() => user?.uid && navigation.navigate('Followers')}>
               <Text style={styles.followNumber}>{followCounts.followerCount}</Text>
               <Text style={styles.followLabel}>Followers</Text>
             </TouchableOpacity>
-            <TouchableOpacity style={styles.followItem} onPress={() => user?.uid && navigateToFollowing(user.uid, 'profile')}>
+            <TouchableOpacity style={styles.followItem} onPress={() => user?.uid && navigation.navigate('Following')}>
               <Text style={styles.followNumber}>{followCounts.followingCount}</Text>
               <Text style={styles.followLabel}>Following</Text>
             </TouchableOpacity>
@@ -363,7 +362,7 @@ export default function Profile() {
       <View style={styles.actionsContainer}>
         <TouchableOpacity 
           style={styles.editProfileButton}
-          onPress={() => router.push("/edit-profile")}
+          onPress={() => navigation.navigate('EditProfile')}
         >
           <Text style={styles.editProfileText}>Edit Profile</Text>
         </TouchableOpacity>
@@ -396,7 +395,7 @@ export default function Profile() {
       {/* Statistics Button */}
       <TouchableOpacity 
         style={styles.statisticsButton}
-        onPress={() => navigateToStatistics('profile')}
+        onPress={() => navigation.navigate('Statistics')}
       >
         <View style={styles.statisticsContent}>
           <View style={styles.statisticsLeft}>
@@ -890,7 +889,6 @@ const styles = StyleSheet.create({
     paddingVertical: 8,
     paddingHorizontal: 20,
     alignItems: "center",
-    marginTop: 10,
   },
   betaText: {
     fontSize: 12,

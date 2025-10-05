@@ -1,6 +1,6 @@
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, TextInput, ActivityIndicator, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useNavigation } from '@react-navigation/native';
 import { useState, useEffect } from "react";
 import { useFocusEffect } from '@react-navigation/native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -10,13 +10,12 @@ import { db } from "../firebase/firebaseInit";
 import { useAuth } from "../contexts/AuthContext";
 import { searchUsers, batchCheckFollowStatus } from "../firebase/followService";
 import { useFollowOperations } from "../hooks/useFollowOperations";
-import { navigateToExternalProfile } from "../utils/navigationUtils";
 import { ErrorBoundary } from "../components/ErrorBoundary";
 import { VirtualizedUserList } from "../components/VirtualizedUserList";
 
 export default function Search() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const navigation = useNavigation();
   const { user: currentUser } = useAuth();
   const [searchQuery, setSearchQuery] = useState("");
   const [users, setUsers] = useState<any[]>([]);
@@ -104,14 +103,14 @@ export default function Search() {
   };
 
   const handleUserPress = (userId: string) => {
-    navigateToExternalProfile(userId, 'search');
+    navigation.navigate('ExternalUserProfile', { id: userId, returnTo: 'search' });
   };
 
   const handleBack = () => {
     setSearchQuery("");
     setUsers([]);
     setHasSearched(false);
-    router.back();
+    navigation.goBack();
   };
 
   // Refresh follow status for all users when page comes into focus
@@ -145,13 +144,6 @@ export default function Search() {
   return (
     <ErrorBoundary>
       <View style={styles.container}>
-      <View style={[styles.header, { paddingTop: insets.top + 12 }]}>
-        <TouchableOpacity style={styles.backButton} onPress={handleBack}>
-          <Ionicons name="arrow-back" size={24} color="#2D5A27" />
-        </TouchableOpacity>
-        <Text style={styles.title}>Search</Text>
-        <View style={{ width: 40 }} />
-      </View>
 
       <View style={styles.searchContainer}>
         <View style={styles.searchInputContainer}>

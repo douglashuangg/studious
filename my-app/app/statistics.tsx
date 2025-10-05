@@ -1,13 +1,13 @@
 import { Text, View, StyleSheet, ScrollView, TouchableOpacity } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { useState, useEffect } from "react";
 import { getStudySessions } from "../firebase/studySessionService";
-import { navigateBack } from "../utils/navigationUtils";
 
 export default function Statistics() {
-  const router = useRouter();
-  const { returnTo } = useLocalSearchParams();
+  const route = useRoute();
+  const navigation = useNavigation();
+  const { returnTo } = route.params || {};
   const [studySessions, setStudySessions] = useState<any[]>([]);
   const [loading, setLoading] = useState(true);
   const [timeFilter, setTimeFilter] = useState('day'); // 'day', 'week', 'month', 'all'
@@ -103,22 +103,6 @@ export default function Statistics() {
   if (loading) {
     return (
       <View style={styles.container}>
-        <View style={styles.header}>
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => {
-              if (returnTo && typeof returnTo === 'string') {
-                navigateBack(returnTo);
-              } else {
-                router.back();
-              }
-            }}
-          >
-            <Ionicons name="arrow-back" size={24} color="#000" />
-          </TouchableOpacity>
-          <Text style={styles.headerTitle}>Statistics</Text>
-          <View style={styles.placeholder} />
-        </View>
         <View style={styles.loadingContainer}>
           <Text style={styles.loadingText}>Loading statistics...</Text>
         </View>
@@ -128,23 +112,6 @@ export default function Statistics() {
 
   return (
     <ScrollView style={styles.container}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => {
-            if (returnTo && typeof returnTo === 'string') {
-              navigateBack(returnTo);
-            } else {
-              router.back();
-            }
-          }}
-        >
-          <Ionicons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>Statistics</Text>
-        <View style={styles.placeholder} />
-      </View>
 
       {/* Time Filter */}
       <View style={styles.filterContainer}>

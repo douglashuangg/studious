@@ -1,21 +1,21 @@
 import { Text, View, StyleSheet, Image, TouchableOpacity, ScrollView, ActivityIndicator, Alert } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { useState, useEffect } from "react";
 import { useFocusEffect } from '@react-navigation/native';
 import { doc, getDoc, collection, query, where, getDocs } from "firebase/firestore";
 import { db } from "../../firebase/firebaseInit";
 import { useAuth } from "../../contexts/AuthContext";
 import { followUser, unfollowUser, isFollowing as checkIsFollowing, getFollowers, getFollowing } from "../../firebase/followService";
-import { navigateBack } from "../../utils/navigationUtils";
 import { generateRecentDailySummaries } from "../../firebase/dailySummaryService.js";
 import { useLikes } from "../../hooks/useLikes";
 import LikersModal from "../../components/LikersModal";
 import React from 'react';
 
 export default function ExternalUserProfile() {
-  const { id, returnTo, originalReturnTo } = useLocalSearchParams();
-  const router = useRouter();
+  const route = useRoute();
+  const navigation = useNavigation();
+  const { id, returnTo, originalReturnTo } = route.params || {};
   const { user: currentUser, isNewUser } = useAuth();
   
   // State management
@@ -48,7 +48,7 @@ export default function ExternalUserProfile() {
         const userDoc = await getDoc(doc(db, 'users', id as string));
         if (!userDoc.exists()) {
           Alert.alert("User Not Found", "This user doesn't exist.");
-          router.back();
+          navigation.goBack();
           return;
         }
         
@@ -329,7 +329,7 @@ export default function ExternalUserProfile() {
     return (
       <View style={styles.errorContainer}>
         <Text style={styles.errorText}>User not found</Text>
-        <TouchableOpacity style={styles.backButton} onPress={() => router.back()}>
+        <TouchableOpacity style={styles.backButton} onPress={() => navigation.goBack()}>
           <Text style={styles.backButtonText}>Go Back</Text>
         </TouchableOpacity>
       </View>
@@ -337,23 +337,6 @@ export default function ExternalUserProfile() {
   }
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header with Back Button */}
-      <View style={styles.header}>
-        <TouchableOpacity 
-          style={styles.backButton}
-          onPress={() => {
-            if (returnTo && typeof returnTo === 'string') {
-              navigateBack(returnTo, id as string);
-            } else if (originalReturnTo && typeof originalReturnTo === 'string') {
-              navigateBack(originalReturnTo, id as string);
-            } else {
-              router.back();
-            }
-          }}
-        >
-          <Ionicons name="arrow-back" size={24} color="#000" />
-        </TouchableOpacity>
-      </View>
 
       {/* Profile Picture and Info */}
       <View style={styles.profileSection}>
@@ -393,20 +376,14 @@ export default function ExternalUserProfile() {
       <View style={styles.followContainer}>
         <TouchableOpacity 
           style={styles.followItem}
-          onPress={() => router.push({
-            pathname: '/followers',
-            params: { userId: id, returnTo: 'external-profile', originalReturnTo: returnTo }
-          })}
+          onPress={() => navigation.navigate('Followers', { userId: id, returnTo: 'external-profile', originalReturnTo: returnTo })}
         >
           <Text style={styles.followNumber}>{followers.length}</Text>
           <Text style={styles.followLabel}>Followers</Text>
         </TouchableOpacity>
         <TouchableOpacity 
           style={styles.followItem}
-          onPress={() => router.push({
-            pathname: '/following',
-            params: { userId: id, returnTo: 'external-profile', originalReturnTo: returnTo }
-          })}
+          onPress={() => navigation.navigate('Following', { userId: id, returnTo: 'external-profile', originalReturnTo: returnTo })}
         >
           <Text style={styles.followNumber}>{following.length}</Text>
           <Text style={styles.followLabel}>Following</Text>
@@ -629,7 +606,7 @@ const styles = StyleSheet.create({
   },
   profileSection: {
     alignItems: "center",
-    paddingTop: 0,
+    paddingTop: 20,
     paddingBottom: 20,
     paddingHorizontal: 20,
     backgroundColor: "#ffffff",
