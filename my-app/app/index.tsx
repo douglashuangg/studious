@@ -390,7 +390,7 @@ export default function Index() {
           <Text style={styles.appTitle}>Studious</Text>
         </View>
         <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.searchButton} onPress={() => router.push("/search")}>
+          <TouchableOpacity style={styles.searchButton} onPress={() => navigation.navigate('Search')}>
             <Ionicons name="search" size={24} color="#4A7C59" />
           </TouchableOpacity>
         </View>
