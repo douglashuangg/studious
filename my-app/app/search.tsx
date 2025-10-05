@@ -23,7 +23,7 @@ export default function Search() {
   const [hasSearched, setHasSearched] = useState(false);
   
   // Use the follow operations hook for race condition prevention
-  const { toggleFollow, isLoading: isFollowLoading } = useFollowOperations(currentUser?.uid);
+  const { toggleFollow, isLoading: isFollowLoading } = useFollowOperations(currentUser?.uid || '') as any;
 
   // Search users using the follow service
   const searchUsersInFirebase = async (searchTerm: string) => {
@@ -48,7 +48,7 @@ export default function Search() {
       // Add follow status to users
       const usersWithFollowStatus = searchResults.map(user => ({
         ...user,
-        isFollowing: followStatusMap[user.id] || false
+        isFollowing: (followStatusMap as any)[user.id] || false
       }));
       
       setUsers(usersWithFollowStatus);
@@ -90,7 +90,7 @@ export default function Search() {
       () => {
         // Success callback - UI already updated
       },
-      (error) => {
+      (error: any) => {
         // Error callback - revert UI state
         setUsers(users.map(user => 
           user.id === userId 
@@ -124,7 +124,7 @@ export default function Search() {
       
       const updatedUsers = users.map(user => ({
         ...user,
-        isFollowing: followStatusMap[user.id] || false
+        isFollowing: (followStatusMap as any)[user.id] || false
       }));
       setUsers(updatedUsers);
     } catch (error) {

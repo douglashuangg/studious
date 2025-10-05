@@ -1,6 +1,15 @@
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { NavigationContainer } from '@react-navigation/native';
+
+// Override navigation types globally
+declare global {
+  namespace ReactNavigation {
+    interface RootParamList {
+      [key: string]: any;
+    }
+  }
+}
 import { TouchableOpacity, Text } from 'react-native';
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
