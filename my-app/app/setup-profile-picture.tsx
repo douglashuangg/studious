@@ -5,6 +5,7 @@ import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase/firebaseInit";
+import { uploadProfilePicture } from "../firebase/profilePictureService";
 import * as ImagePicker from 'expo-image-picker';
 
 export default function SetupProfilePicture() {
@@ -64,9 +65,16 @@ export default function SetupProfilePicture() {
         updatedAt: new Date()
       };
 
-      // If a profile picture was selected, save the URI
+      // If a profile picture was selected, upload it to Firebase Storage first
       if (profileImageUri) {
-        updateData.profilePictureUrl = profileImageUri;
+        try {
+          const downloadURL = await uploadProfilePicture(user!.uid, profileImageUri);
+          updateData.profilePictureUrl = downloadURL;
+        } catch (uploadError) {
+          console.error('Error uploading profile picture:', uploadError);
+          Alert.alert("Upload Error", "Failed to upload profile picture. Please try again.");
+          return;
+        }
       }
 
       await updateDoc(doc(db, 'users', user!.uid), updateData);

@@ -380,16 +380,19 @@ export default function Index() {
       }
     >
       {/* Alpha Badge */}
-      <View style={styles.betaContainer}>
-        <View style={styles.betaBadge}>
+      <View style={[styles.betaContainer, { marginTop: insets.top }]}>
           <Text style={styles.betaText}>ALPHA v0.1.0</Text>
-        </View>
       </View>
 
       {/* Top Header with Notifications */}
       <View style={styles.topHeader}>
         <View style={styles.topHeaderLeft}>
           <Text style={styles.appTitle}>Studious</Text>
+        </View>
+        <View style={styles.headerButtons}>
+          <TouchableOpacity style={styles.searchButton} onPress={() => router.push("/search")}>
+            <Ionicons name="search" size={24} color="#4A7C59" />
+          </TouchableOpacity>
         </View>
         <View style={styles.topHeaderRight}>
           <TouchableOpacity 
@@ -484,13 +487,7 @@ export default function Index() {
       {/* Daily Summary Feed Header */}
       <View style={styles.feedHeader}>
         <Text style={styles.feedTitle}>Daily Study Summaries</Text>
-        <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.searchButton} onPress={() => router.push("/search")}>
-            <Ionicons name="search" size={20} color="#4A7C59" />
-          </TouchableOpacity>
-        </View>
       </View>
-
       {/* Daily Summary Feed */}
       <View style={styles.feedContainer}>
         {summariesLoading ? (
@@ -813,7 +810,7 @@ const styles = StyleSheet.create({
   },
   searchButton: {
     padding: 8,
-    backgroundColor: "#f0f0f0",
+    // backgroundColor: "#f0f0f0",
     borderRadius: 8,
   },
   settingsButton: {
@@ -1014,9 +1011,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     alignItems: "center",
     marginTop: 10,
-  },
-  betaBadge: {
-    // No additional styling needed - container handles it
   },
   betaText: {
     fontSize: 12,
