@@ -1,7 +1,6 @@
 import { Text, View, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image } from "react-native";
-import PageHeader from "../components/PageHeader";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useNavigation } from '@react-navigation/native';
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, updateDoc, getDoc, setDoc } from "firebase/firestore";
@@ -10,7 +9,7 @@ import * as ImagePicker from 'expo-image-picker';
 import { uploadProfilePicture } from "../firebase/profilePictureService";
 
 export default function EditProfile() {
-  const router = useRouter();
+  const navigation = useNavigation();
   const { user, logout } = useAuth();
   
   // Form state
@@ -24,10 +23,35 @@ export default function EditProfile() {
   const [profilePictureUrl, setProfilePictureUrl] = useState("");
   const [uploading, setUploading] = useState(false);
 
+  // Set up dynamic header with save button
+  useEffect(() => {
+    navigation.setOptions({
+      headerTintColor: '#000000', // Black back button
+      headerRight: () => (
+        <TouchableOpacity 
+          style={{ marginRight: 10 }}
+          onPress={handleSave}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="#4A7C59" />
+          ) : (
+            <Text style={{ 
+              color: saving ? '#999' : '#4A7C59', 
+              fontSize: 16, 
+              fontWeight: '600' 
+            }}>Save</Text>
+          )}
+        </TouchableOpacity>
+      )
+    });
+  }, [navigation, saving, loading]);
+
   // Load user data on mount
   useEffect(() => {
     const loadUserData = async () => {
       if (!user) return;
+      
       
       try {
         setLoading(true);
@@ -56,7 +80,7 @@ export default function EditProfile() {
     };
 
     loadUserData();
-  }, [user]);
+  }, []); // Only run once on mount
 
   const handleSave = async () => {
     if (!user) {
@@ -64,10 +88,21 @@ export default function EditProfile() {
       return;
     }
 
-    if (!firstName.trim() || !lastName.trim()) {
-      Alert.alert("Required Fields", "First name and last name are required.");
+
+    // Only validate if fields are truly empty (not just whitespace)
+    if (!firstName || firstName.trim() === '') {
+      Alert.alert("Required Fields", "First name is required.");
       return;
     }
+    
+    if (!lastName || lastName.trim() === '') {
+      Alert.alert("Required Fields", "Last name is required.");
+      return;
+    }
+    
+    const trimmedFirstName = firstName.trim();
+    const trimmedLastName = lastName.trim();
+    
 
     if (!username.trim()) {
       Alert.alert("Required Fields", "Username is required.");
@@ -78,16 +113,17 @@ export default function EditProfile() {
       setSaving(true);
       
       const userData = {
-        firstName: firstName.trim(),
-        lastName: lastName.trim(),
+        firstName: trimmedFirstName,
+        lastName: trimmedLastName,
         username: username.trim(),
         school: school.trim(),
         bio: bio.trim(),
-        displayName: `${firstName.trim()} ${lastName.trim()}`,
+        displayName: `${trimmedFirstName} ${trimmedLastName}`,
         email: user.email,
         createdAt: user.metadata?.creationTime ? new Date(user.metadata.creationTime) : new Date(),
         updatedAt: new Date()
       };
+
 
       // Check if user document exists
       const userDocRef = doc(db, 'users', user.uid);
@@ -102,7 +138,7 @@ export default function EditProfile() {
       }
       
       // Navigate back to profile page after successful save
-      router.push("/profile");
+      navigation.goBack();
       
     } catch (error) {
       console.error('❌ Error saving profile:', error);
@@ -206,24 +242,6 @@ export default function EditProfile() {
 
   return (
     <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
-      {/* Header */}
-      <PageHeader
-        title="Edit Profile"
-        left={
-          <TouchableOpacity style={styles.backButton} onPress={() => router.push("/profile")}>
-            <Ionicons name="arrow-back" size={24} color="#000" />
-          </TouchableOpacity>
-        }
-        right={
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave} disabled={saving}>
-            {saving ? (
-              <ActivityIndicator size="small" color="#2D5A27" />
-            ) : (
-              <Text style={styles.saveButtonText}>Save</Text>
-            )}
-          </TouchableOpacity>
-        }
-      />
 
       {/* Profile Picture Section */}
       <View style={styles.profilePictureSection}>

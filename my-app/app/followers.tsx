@@ -1,11 +1,9 @@
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { getFollowers, followUser, unfollowUser, isFollowing } from "../firebase/followService";
-import { navigateToExternalProfile, navigateBack } from "../utils/navigationUtils";
-import PageHeader from "../components/PageHeader";
 
 interface Follower {
   id: string;
@@ -19,8 +17,9 @@ interface Follower {
 }
 
 export default function Followers() {
-  const router = useRouter();
-  const { userId, returnTo, originalReturnTo } = useLocalSearchParams();
+  const route = useRoute();
+  const navigation = useNavigation();
+  const { userId, returnTo, originalReturnTo } = route.params || {};
   const { user } = useAuth();
   const [followers, setFollowers] = useState<Follower[]>([]);
   const [loading, setLoading] = useState(true);
@@ -87,26 +86,6 @@ export default function Followers() {
 
   return (
     <View style={styles.container}>
-      <PageHeader 
-        title={targetUserId === user?.uid ? 'Followers' : 'Followers'}
-        left={
-          <TouchableOpacity 
-            style={styles.backButton}
-            onPress={() => {
-              if (returnTo && typeof returnTo === 'string') {
-                const additionalParams: { originalReturnTo?: string } = {};
-                if (originalReturnTo) additionalParams.originalReturnTo = originalReturnTo as string;
-                navigateBack(returnTo, userId as string, additionalParams);
-              } else {
-                router.back();
-              }
-            }}
-          >
-            <Ionicons name="chevron-back" size={24} color="#2D5A27" />
-          </TouchableOpacity>
-        }
-        right={<View style={{ width: 40 }} />}
-      />
 
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -121,7 +100,7 @@ export default function Followers() {
           renderItem={({ item }) => (
             <TouchableOpacity 
               style={styles.itemRow}
-              onPress={() => navigateToExternalProfile(item.id, returnTo as string, originalReturnTo as string)}
+              onPress={() => navigation.navigate('ExternalUserProfile', { id: item.id, returnTo, originalReturnTo })}
             >
               {item.profilePicture ? (
                 <Image 

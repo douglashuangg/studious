@@ -1,14 +1,117 @@
-import { Tabs } from "expo-router";
+import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
+import { NavigationContainer } from '@react-navigation/native';
+import { TouchableOpacity, Text } from 'react-native';
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
 import { AuthProvider } from "../contexts/AuthContext";
 import AuthWrapper from "../components/AuthWrapper";
 
-export default function RootLayout() {
+// Import your existing screen components
+import HomeScreen from './index';
+import RecordScreen from './record';
+import CalendarScreen from './calendar';
+import ProfileScreen from './profile';
+import FollowersScreen from './followers';
+import FollowingScreen from './following';
+import SearchScreen from './search';
+import ExternalUserProfileScreen from './user-profile/external-user-profile';
+import NotificationsScreen from './notifications';
+import EditProfileScreen from './edit-profile';
+import StatisticsScreen from './statistics';
+
+const Tab = createBottomTabNavigator();
+const Stack = createNativeStackNavigator();
+
+function ProfileStack() {
   return (
-    <AuthProvider>
-      <AuthWrapper>
-        <Tabs
+    <Stack.Navigator>
+      <Stack.Screen name="ProfileMain" component={ProfileScreen} />
+      <Stack.Screen 
+        name="Followers" 
+        component={FollowersScreen} 
+        options={{ title: "Followers" }}
+      />
+      <Stack.Screen 
+        name="Following" 
+        component={FollowingScreen} 
+        options={{ title: "Following" }}
+      />
+      <Stack.Screen 
+        name="ExternalUserProfile" 
+        component={ExternalUserProfileScreen} 
+        options={{ 
+          headerShown: true,
+          title: "",
+          headerTintColor: '#000000' // Black back button
+        }}
+      />
+      <Stack.Screen 
+        name="EditProfile" 
+        component={EditProfileScreen} 
+        options={{ title: "Edit Profile" }}
+      />
+      <Stack.Screen 
+        name="Statistics" 
+        component={StatisticsScreen} 
+        options={{ title: "Statistics" }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+function MainStack() {
+  return (
+    <Stack.Navigator screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="Tabs" component={AppTabs} />
+      <Stack.Screen 
+        name="Search" 
+        component={SearchScreen} 
+        options={{ 
+          headerShown: true,
+          title: "Search" 
+        }}
+      />
+      <Stack.Screen 
+        name="Notifications" 
+        component={NotificationsScreen} 
+        options={{ 
+          headerShown: true,
+          title: "Notifications" 
+        }}
+      />
+      <Stack.Screen 
+        name="ExternalUserProfile" 
+        component={ExternalUserProfileScreen} 
+        options={{ 
+          headerShown: true,
+          title: "",
+          headerTintColor: '#000000' // Black back button
+        }}
+      />
+      <Stack.Screen 
+        name="Followers" 
+        component={FollowersScreen} 
+        options={{ 
+          headerShown: true,
+          title: "Followers" 
+        }}
+      />
+      <Stack.Screen 
+        name="Following" 
+        component={FollowingScreen} 
+        options={{ 
+          headerShown: true,
+          title: "Following" 
+        }}
+      />
+    </Stack.Navigator>
+  );
+}
+
+function AppTabs() {
+  return (
+    <Tab.Navigator
       screenOptions={{
         tabBarActiveTintColor: "#4A7C59",
         tabBarInactiveTintColor: "#8E8E93",
@@ -28,104 +131,55 @@ export default function RootLayout() {
         },
       }}
     >
-      <Tabs.Screen
-        name="index"
+      <Tab.Screen 
+        name="Home" 
+        component={HomeScreen}
         options={{
-          // title: "Studious",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="home" size={size} color={color} />
           ),
         }}
       />
-      <Tabs.Screen
-        name="record"
+      <Tab.Screen 
+        name="Record" 
+        component={RecordScreen}
         options={{
-          // title: "Timer",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="stopwatch" size={size} color={color} />
           ),
         }}
       />
-      <Tabs.Screen
-        name="calendar"
+      <Tab.Screen 
+        name="Calendar" 
+        component={CalendarScreen}
         options={{
-          // title: "Calendar",
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="calendar" size={size} color={color} />
           ),
         }}
       />
-      <Tabs.Screen
-        name="profile"
-        options={{
-          // title: "Profile",
+      <Tab.Screen 
+        name="Profile" 
+        component={ProfileStack} 
+        options={{ 
+          headerShown: false,
           tabBarIcon: ({ color, size }) => (
             <Ionicons name="person" size={size} color={color} />
           ),
-        }}
+        }} 
       />
-      <Tabs.Screen
-        name="followers"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="following"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="edit-profile"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="search"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="user-profile/external-user-profile"
-        options={{
-          href: null, // Hide from tab bar
-          headerShown: false, // Hide the top header
-        }}
-      />
-      <Tabs.Screen
-        name="statistics"
-        options={{
-          href: null, // Hide from tab bar
-          headerShown: false, // Hide the top header
-        }}
-      />
-      <Tabs.Screen
-        name="setup-profile"
-        options={{
-          href: null, // Hide from tab bar
-          headerShown: false, // Hide the top header
-          tabBarStyle: { display: 'none' }, // Completely hide tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="setup-profile-picture"
-        options={{
-          href: null, // Hide from tab bar
-          headerShown: false, // Hide the top header
-          tabBarStyle: { display: 'none' }, // Completely hide tab bar
-        }}
-      />
-      <Tabs.Screen
-        name="notifications"
-        options={{
-          href: null, // Hide from tab bar
-        }}
-      />
-    </Tabs>
-        </AuthWrapper>
-      </AuthProvider>
+    </Tab.Navigator>
+  );
+}
+
+export default function App() {
+  return (
+    <AuthProvider>
+      <AuthWrapper>
+        <NavigationContainer>
+          <MainStack />
+        </NavigationContainer>
+      </AuthWrapper>
+    </AuthProvider>
   );
 }

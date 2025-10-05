@@ -1,7 +1,7 @@
 import { Text, View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
+import { useNavigation } from '@react-navigation/native';
 import { useState, useEffect } from "react";
 import * as Haptics from "expo-haptics";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
@@ -15,7 +15,7 @@ import LikersModal from "../components/LikersModal";
 
 export default function Index() {
   const insets = useSafeAreaInsets();
-  const router = useRouter();
+  const navigation = useNavigation();
   const { user } = useAuth();
   
   // Get currently studying users from followers
@@ -394,7 +394,7 @@ export default function Index() {
         <View style={styles.topHeaderRight}>
           <TouchableOpacity 
             style={styles.topNotificationButton}
-            onPress={() => router.push("/notifications")}
+            onPress={() => navigation.navigate('Notifications')}
           >
             <Ionicons name="notifications-outline" size={24} color="#4A7C59" />
           </TouchableOpacity>
@@ -421,7 +421,7 @@ export default function Index() {
                 style={styles.storyItem}
                 onPress={() => {
                   if (story.id !== 'zzz') {
-                    router.push(`/user-profile/external-user-profile?id=${story.id}`);
+                    navigation.navigate('ExternalUserProfile', { id: story.id });
                   }
                 }}
                 disabled={story.id === 'zzz'}
@@ -485,7 +485,7 @@ export default function Index() {
       <View style={styles.feedHeader}>
         <Text style={styles.feedTitle}>Daily Study Summaries</Text>
         <View style={styles.headerButtons}>
-          <TouchableOpacity style={styles.searchButton} onPress={() => router.push("/search")}>
+          <TouchableOpacity style={styles.searchButton} onPress={() => navigation.navigate('Search')}>
             <Ionicons name="search" size={20} color="#4A7C59" />
           </TouchableOpacity>
         </View>
@@ -514,7 +514,7 @@ export default function Index() {
               activeOpacity={1}
               onPress={() => {
                 if (!summary.userProfile?.isOwn) {
-                  router.push(`/user-profile/external-user-profile?id=${summary.userId}`);
+                  navigation.navigate('ExternalUserProfile', { id: summary.userId });
                 }
               }}
             >

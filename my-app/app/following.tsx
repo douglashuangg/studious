@@ -1,11 +1,9 @@
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRouter, useLocalSearchParams } from "expo-router";
+import { useRoute, useNavigation } from '@react-navigation/native';
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { getFollowing, unfollowUser } from "../firebase/followService";
-import { navigateToExternalProfile, navigateBack } from "../utils/navigationUtils";
-import PageHeader from "../components/PageHeader";
 
 interface FollowingUser {
   id: string;
@@ -19,8 +17,9 @@ interface FollowingUser {
 }
 
 export default function Following() {
-  const router = useRouter();
-  const { userId, returnTo, originalReturnTo } = useLocalSearchParams();
+  const route = useRoute();
+  const navigation = useNavigation();
+  const { userId, returnTo, originalReturnTo } = route.params || {};
   const { user } = useAuth();
   const [following, setFollowing] = useState<FollowingUser[]>([]);
   const [loading, setLoading] = useState(true);
@@ -62,26 +61,6 @@ export default function Following() {
 
   return (
     <View style={styles.container}>
-      <PageHeader 
-        title="Following"
-        left={
-          <TouchableOpacity 
-            style={styles.backButton} 
-            onPress={() => {
-              if (returnTo && typeof returnTo === 'string') {
-                const additionalParams: { originalReturnTo?: string } = {};
-                if (originalReturnTo) additionalParams.originalReturnTo = originalReturnTo as string;
-                navigateBack(returnTo, userId as string, additionalParams);
-              } else {
-                router.back();
-              }
-            }}
-          >
-            <Ionicons name="chevron-back" size={24} color="#2D5A27" />
-          </TouchableOpacity>
-        }
-        right={<View style={{ width: 40 }} />}
-      />
 
       {loading ? (
         <View style={styles.loadingContainer}>
@@ -96,7 +75,7 @@ export default function Following() {
           renderItem={({ item }) => (
             <TouchableOpacity 
               style={styles.itemRow}
-              onPress={() => navigateToExternalProfile(item.id, returnTo as string, originalReturnTo as string)}
+              onPress={() => navigation.navigate('ExternalUserProfile', { id: item.id, returnTo, originalReturnTo })}
             >
               {item.profilePicture ? (
                 <Image 
