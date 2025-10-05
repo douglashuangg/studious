@@ -12,6 +12,8 @@ import {
   onSnapshot
 } from "firebase/firestore";
 import { db, auth } from "./firebaseInit.js";
+import { createDailyPost } from "./postService.js";
+import { generateDailySummary } from "./dailySummaryService.js";
 
 // Collection name for study sessions
 const STUDY_SESSIONS_COLLECTION = "studySessions";
@@ -182,6 +184,38 @@ export const getActiveStudySessions = async () => {
     return sessions;
   } catch (error) {
     console.error("Error getting active study sessions: ", error);
+    throw error;
+  }
+};
+
+/**
+ * Generate a daily post when study sessions end (call this at the end of each day)
+ * @param {string} userId - User ID
+ * @param {Date} date - Date to generate post for (defaults to yesterday)
+ * @returns {Promise<string|null>} Post ID if created, null if no study time
+ */
+export const generateDailyPost = async (userId, date = null) => {
+  try {
+    // Default to yesterday if no date provided
+    if (!date) {
+      date = new Date();
+      date.setDate(date.getDate() - 1);
+    }
+    
+    // Generate the daily summary
+    const summary = await generateDailySummary(date, userId);
+    
+    // Only create post if there was actual study time
+    if (summary.totalStudyTime > 0) {
+      const postId = await createDailyPost(userId, date, summary);
+      console.log('✅ Daily post generated:', postId);
+      return postId;
+    }
+    
+    console.log('No study time for date, skipping post generation');
+    return null;
+  } catch (error) {
+    console.error('❌ Error generating daily post:', error);
     throw error;
   }
 };

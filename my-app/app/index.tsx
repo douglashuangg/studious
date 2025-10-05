@@ -132,7 +132,8 @@ export default function Index() {
 
       try {
         setSummariesLoading(true);
-        const summaries = await generateSocialDailySummaries(7, user.uid);
+        
+        const summaries = await generateSocialDailySummaries(7, user.uid, 10);
         setDailySummaries(summaries);
       } catch (error) {
         console.error('Error loading social daily summaries:', error);
@@ -344,7 +345,7 @@ export default function Index() {
 
         try {
           setSummariesLoading(true);
-          const summaries = await generateSocialDailySummaries(7, user.uid);
+          const summaries = await generateSocialDailySummaries(7, user.uid, 10);
           setDailySummaries(summaries);
         } catch (error) {
           console.error('Error loading social daily summaries:', error);

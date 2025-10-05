@@ -154,25 +154,40 @@ export const getFollowers = async (userId, limitCount = 50) => {
     const followsSnapshot = await getDocs(followsQuery);
     const followers = [];
 
-    for (const followDoc of followsSnapshot.docs) {
-      const followData = followDoc.data();
-      const userRef = doc(db, 'users', followData.followerId);
+    // Collect all user IDs first
+    const followerIds = followsSnapshot.docs.map(doc => doc.data().followerId);
+    
+    if (followerIds.length === 0) {
+      return [];
+    }
+
+    // Batch fetch all user data at once
+    const userPromises = followerIds.map(async (followerId) => {
+      const userRef = doc(db, 'users', followerId);
       const userDoc = await getDoc(userRef);
-      
+      return { followerId, userDoc };
+    });
+
+    const userResults = await Promise.all(userPromises);
+
+    // Process results
+    userResults.forEach(({ followerId, userDoc }) => {
       if (userDoc.exists()) {
         const userData = userDoc.data();
+        const followData = followsSnapshot.docs.find(doc => doc.data().followerId === followerId)?.data();
+        
         followers.push({
-          id: followData.followerId,
+          id: followerId,
           displayName: userData.displayName || 'Unknown User',
           username: userData.username || userData.email?.split('@')[0] || 'user',
           bio: userData.bio || '',
           profilePicture: userData.profilePictureUrl || null,
           followerCount: userData.followerCount || 0,
           followingCount: userData.followingCount || 0,
-          followedAt: followData.createdAt
+          followedAt: followData?.createdAt
         });
       }
-    }
+    });
 
     // Sort by followedAt date in JavaScript (newest first)
     followers.sort((a, b) => {
@@ -201,25 +216,40 @@ export const getFollowing = async (userId, limitCount = 50) => {
     const followsSnapshot = await getDocs(followsQuery);
     const following = [];
 
-    for (const followDoc of followsSnapshot.docs) {
-      const followData = followDoc.data();
-      const userRef = doc(db, 'users', followData.followingId);
+    // Collect all user IDs first
+    const followingIds = followsSnapshot.docs.map(doc => doc.data().followingId);
+    
+    if (followingIds.length === 0) {
+      return [];
+    }
+
+    // Batch fetch all user data at once
+    const userPromises = followingIds.map(async (followingId) => {
+      const userRef = doc(db, 'users', followingId);
       const userDoc = await getDoc(userRef);
-      
+      return { followingId, userDoc };
+    });
+
+    const userResults = await Promise.all(userPromises);
+
+    // Process results
+    userResults.forEach(({ followingId, userDoc }) => {
       if (userDoc.exists()) {
         const userData = userDoc.data();
+        const followData = followsSnapshot.docs.find(doc => doc.data().followingId === followingId)?.data();
+        
         following.push({
-          id: followData.followingId,
+          id: followingId,
           displayName: userData.displayName || 'Unknown User',
           username: userData.username || userData.email?.split('@')[0] || 'user',
           bio: userData.bio || '',
           profilePicture: userData.profilePictureUrl || null,
           followerCount: userData.followerCount || 0,
           followingCount: userData.followingCount || 0,
-          followedAt: followData.createdAt
+          followedAt: followData?.createdAt
         });
       }
-    }
+    });
 
     // Sort by followedAt date in JavaScript (newest first)
     following.sort((a, b) => {

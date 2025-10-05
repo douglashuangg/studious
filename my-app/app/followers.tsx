@@ -137,8 +137,6 @@ export default function Followers() {
               )}
               <View style={styles.itemText}>
                 <Text style={styles.name}>{item.displayName}</Text>
-                <Text style={styles.username}>@{item.username}</Text>
-                {item.bio && <Text style={styles.bio} numberOfLines={1}>{item.bio}</Text>}
               </View>
               {targetUserId === user?.uid && (
                 <TouchableOpacity 

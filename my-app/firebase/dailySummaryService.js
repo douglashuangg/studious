@@ -10,6 +10,7 @@ import {
 } from "firebase/firestore";
 import { db, auth } from "./firebaseInit.js";
 import { getFollowing } from "./followService.js";
+import { getSocialFeedPosts, getUserPosts } from "./postService.js";
 
 // Collection name for study sessions
 const STUDY_SESSIONS_COLLECTION = "studySessions";
@@ -70,175 +71,47 @@ export const generateDailySummary = async (date, userId = null) => {
 };
 
 /**
- * Generate daily summaries for the last N days
- * @param {number} days - Number of days to generate summaries for
+ * Get recent daily posts for a user from the posts collection
+ * @param {number} days - Number of days to fetch posts for
  * @param {string} userId - Optional user ID, defaults to current user
- * @returns {Array} Array of daily summary objects
+ * @returns {Array} Array of post objects
  */
 export const generateRecentDailySummaries = async (days = 7, userId = null) => {
   try {
-    const summaries = [];
-    const today = new Date();
-    
-    for (let i = 0; i < days; i++) {
-      const date = new Date(today);
-      date.setDate(date.getDate() - i);
-      
-      const summary = await generateDailySummary(date, userId);
-      summaries.push(summary);
+    const user = userId || auth.currentUser?.uid;
+    if (!user) {
+      throw new Error("User must be authenticated to get recent posts");
     }
+
+    // Fetch from posts collection - much faster!
+    const posts = await getUserPosts(user, days);
     
-    return summaries;
+    return posts;
   } catch (error) {
-    console.error("Error generating recent daily summaries: ", error);
+    console.error("Error getting recent posts: ", error);
     throw error;
   }
 };
 
 /**
- * Generate social daily summaries including own data and followed users' data
- * @param {number} days - Number of days to generate summaries for
+ * Get social feed posts from the posts collection (much faster than generating on-the-fly)
+ * @param {number} limit - Maximum number of posts to return (default: 10)
  * @param {string} userId - Optional user ID, defaults to current user
- * @returns {Array} Array of social daily summary objects
+ * @returns {Array} Array of post objects
  */
-export const generateSocialDailySummaries = async (days = 7, userId = null) => {
+export const generateSocialDailySummaries = async (days = 7, userId = null, limit = 10) => {
   try {
     const user = userId || auth.currentUser?.uid;
     if (!user) {
-      throw new Error("User must be authenticated to generate social daily summaries");
+      throw new Error("User must be authenticated to get social feed posts");
     }
 
-    // Get list of users that the current user is following
-    const followingUsers = await getFollowing(user, 50);
+    // Simply fetch from the posts collection - much faster!
+    const posts = await getSocialFeedPosts(user, limit);
     
-    // Create array of user IDs to fetch summaries for (including self)
-    const userIdsToFetch = [user, ...followingUsers.map(u => u.id)];
-    
-    const allSummaries = [];
-    const today = new Date();
-    
-    // Get all study sessions for all users in the date range at once
-    const startDate = new Date(today);
-    startDate.setDate(startDate.getDate() - days);
-    startDate.setHours(0, 0, 0, 0);
-    
-    const endDate = new Date(today);
-    endDate.setHours(23, 59, 59, 999);
-    
-    // Fetch all sessions for all users in the date range
-    const allSessions = [];
-    for (const targetUserId of userIdsToFetch) {
-      try {
-        // Simple query without date range to avoid index issues
-        const sessionsQuery = query(
-          collection(db, STUDY_SESSIONS_COLLECTION),
-          where("userId", "==", targetUserId)
-        );
-        
-        const sessionsSnapshot = await getDocs(sessionsQuery);
-        const userSessions = [];
-        
-        sessionsSnapshot.forEach((doc) => {
-          const sessionData = doc.data();
-          const sessionDate = sessionData.startTime?.toDate ? sessionData.startTime.toDate() : new Date(sessionData.startTime);
-          
-          // Filter by date range in JavaScript
-          if (sessionDate >= startDate && sessionDate <= endDate) {
-            userSessions.push({
-              id: doc.id,
-              ...sessionData,
-              userId: targetUserId
-            });
-          }
-        });
-        
-        allSessions.push(...userSessions);
-      } catch (error) {
-        console.error(`Error fetching sessions for user ${targetUserId}:`, error);
-        // Continue with other users even if one fails
-      }
-    }
-    
-    // Group sessions by user and date
-    const sessionsByUserAndDate = {};
-    allSessions.forEach(session => {
-      const sessionDate = session.startTime?.toDate ? session.startTime.toDate() : new Date(session.startTime);
-      const dateKey = sessionDate.toDateString();
-      const userKey = session.userId;
-      
-      if (!sessionsByUserAndDate[userKey]) {
-        sessionsByUserAndDate[userKey] = {};
-      }
-      if (!sessionsByUserAndDate[userKey][dateKey]) {
-        sessionsByUserAndDate[userKey][dateKey] = [];
-      }
-      
-      sessionsByUserAndDate[userKey][dateKey].push(session);
-    });
-    
-    // Generate summaries for each user and date
-    for (const targetUserId of userIdsToFetch) {
-      try {
-        // Get user profile information once
-        const userDoc = await getDoc(doc(db, 'users', targetUserId));
-        const userData = userDoc.exists() ? userDoc.data() : null;
-        
-        const userProfile = {
-          id: targetUserId,
-          displayName: userData?.displayName || 'Unknown User',
-          username: userData?.username || userData?.email?.split('@')[0] || 'user',
-          profilePicture: userData?.profilePictureUrl || null,
-          isOwn: targetUserId === user
-        };
-        
-        // Generate summaries for each day
-        for (let i = 0; i < days; i++) {
-          const date = new Date(today);
-          date.setDate(date.getDate() - i);
-          const dateKey = date.toDateString();
-          
-          // Only generate posts for completed days (not today)
-          // Skip today since it hasn't been completed yet
-          const isToday = i === 0;
-          if (isToday) {
-            continue; // Skip today - posts only generate after midnight
-          }
-          
-          const daySessions = sessionsByUserAndDate[targetUserId]?.[dateKey] || [];
-          
-          if (daySessions.length > 0) {
-            const summary = calculateDailyStats(daySessions, date);
-            
-            if (summary.totalStudyTime > 0) {
-              const socialSummary = {
-                ...summary,
-                userId: targetUserId,
-                userProfile
-              };
-              
-              allSummaries.push(socialSummary);
-            }
-          }
-        }
-      } catch (error) {
-        console.error(`Error processing user ${targetUserId}:`, error);
-        // Continue with other users even if one fails
-      }
-    }
-    
-    // Sort all summaries by date (newest first) and then by study time
-    allSummaries.sort((a, b) => {
-      const dateA = new Date(a.date);
-      const dateB = new Date(b.date);
-      if (dateA.getTime() === dateB.getTime()) {
-        return b.totalStudyTime - a.totalStudyTime;
-      }
-      return dateB.getTime() - dateA.getTime();
-    });
-    
-    return allSummaries;
+    return posts;
   } catch (error) {
-    console.error("Error generating social daily summaries: ", error);
+    console.error("Error getting social feed posts: ", error);
     throw error;
   }
 };

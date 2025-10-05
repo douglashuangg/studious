@@ -147,7 +147,7 @@ export default function Profile() {
       if (!user) return [];
       
       // Get social daily summaries (includes own posts)
-      const summaries = await generateSocialDailySummaries(30, user.uid);
+      const summaries = await generateSocialDailySummaries(30, user.uid, 10);
       
       // Filter to only include own posts
       const ownPosts = summaries.filter(summary => summary.userId === user.uid);
