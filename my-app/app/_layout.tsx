@@ -13,8 +13,10 @@ declare global {
 import { TouchableOpacity, Text } from 'react-native';
 import { Ionicons } from "@expo/vector-icons";
 import * as Haptics from "expo-haptics";
+import { useEffect } from 'react';
 import { AuthProvider } from "../contexts/AuthContext";
 import AuthWrapper from "../components/AuthWrapper";
+import { requestNotificationPermissions, getExpoPushToken } from "../firebase/notificationService";
 
 // Import your existing screen components
 import HomeScreen from './index';
@@ -34,8 +36,12 @@ const Stack = createNativeStackNavigator();
 
 function ProfileStack() {
   return (
-    <Stack.Navigator>
-      <Stack.Screen name="ProfileMain" component={ProfileScreen} />
+    <Stack.Navigator screenOptions={{ headerBackButtonDisplayMode: "minimal", headerTintColor: '#000000' }}>
+      <Stack.Screen 
+        name="ProfileMain" 
+        component={ProfileScreen} 
+        options={{ title: "Profile" }}
+      />
       <Stack.Screen 
         name="Followers" 
         component={FollowersScreen} 
@@ -51,14 +57,15 @@ function ProfileStack() {
         component={ExternalUserProfileScreen} 
         options={{ 
           headerShown: true,
-          title: "",
-          headerTintColor: '#000000' // Black back button
+          title: ""
         }}
       />
       <Stack.Screen 
         name="EditProfile" 
         component={EditProfileScreen} 
-        options={{ title: "Edit Profile" }}
+        options={{ 
+          title: "Edit Profile"
+        }}
       />
       <Stack.Screen 
         name="Statistics" 
@@ -71,7 +78,7 @@ function ProfileStack() {
 
 function MainStack() {
   return (
-    <Stack.Navigator screenOptions={{ headerShown: false }}>
+    <Stack.Navigator screenOptions={{ headerShown: false, headerBackButtonDisplayMode: "minimal", headerTintColor: '#000000' }}>
       <Stack.Screen name="Tabs" component={AppTabs} />
       <Stack.Screen 
         name="Search" 
@@ -94,8 +101,7 @@ function MainStack() {
         component={ExternalUserProfileScreen} 
         options={{ 
           headerShown: true,
-          title: "",
-          headerTintColor: '#000000' // Black back button
+          title: ""
         }}
       />
       <Stack.Screen 
@@ -182,6 +188,26 @@ function AppTabs() {
 }
 
 export default function App() {
+  useEffect(() => {
+    // Initialize notifications when app starts
+    const initializeNotifications = async () => {
+      try {
+        const hasPermission = await requestNotificationPermissions();
+        if (hasPermission) {
+          const token = await getExpoPushToken();
+          if (token) {
+            console.log('Push notification token:', token);
+            // You can save this token to your backend/database here
+          }
+        }
+      } catch (error) {
+        console.error('Error initializing notifications:', error);
+      }
+    };
+
+    initializeNotifications();
+  }, []);
+
   return (
     <AuthProvider>
       <AuthWrapper>

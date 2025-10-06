@@ -15,6 +15,7 @@ import {
 } from 'firebase/firestore';
 import { db } from './firebaseInit';
 import { followCache } from '../utils/followCache';
+import { scheduleFollowNotification } from './notificationService';
 
 // Follow a user
 export const followUser = async (currentUserId, targetUserId) => {
@@ -60,6 +61,36 @@ export const followUser = async (currentUserId, targetUserId) => {
     followCache.set(cacheKey, true);
     followCache.invalidateUser(currentUserId);
     followCache.invalidateUser(targetUserId);
+
+    // Send notification to the person being followed
+    try {
+      // Get the follower's info to include in the notification
+      const followerUserRef = doc(db, 'users', currentUserId);
+      const followerUserDoc = await getDoc(followerUserRef);
+      
+      if (followerUserDoc.exists()) {
+        const followerData = followerUserDoc.data();
+        const followerName = followerData.displayName || followerData.firstName || 'Someone';
+        
+        // Send push notification
+        await scheduleFollowNotification(followerName);
+        
+        // Save notification to Firestore for the notifications page
+        await setDoc(doc(db, 'notifications', `${targetUserId}_${Date.now()}`), {
+          userId: targetUserId,
+          type: 'follow',
+          title: 'New Follower! 👥',
+          message: `${followerName} started following you`,
+          isRead: false,
+          createdAt: new Date(),
+          followerId: currentUserId,
+          followerName: followerName
+        });
+      }
+    } catch (notificationError) {
+      // Don't fail the follow operation if notification fails
+      console.error('Error sending follow notification:', notificationError);
+    }
 
     return true;
   } catch (error) {

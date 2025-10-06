@@ -1,7 +1,7 @@
 import { Text, View, StyleSheet, TextInput, TouchableOpacity, ScrollView, Alert, ActivityIndicator, Image } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from '@react-navigation/native';
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, updateDoc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase/firebaseInit";
@@ -23,66 +23,7 @@ export default function EditProfile() {
   const [profilePictureUrl, setProfilePictureUrl] = useState("");
   const [uploading, setUploading] = useState(false);
 
-  // Set up dynamic header with save button
-  useEffect(() => {
-    navigation.setOptions({
-      headerTintColor: '#000000', // Black back button
-      headerRight: () => (
-        <TouchableOpacity 
-          style={{ marginRight: 10 }}
-          onPress={handleSave}
-          disabled={saving}
-        >
-          {saving ? (
-            <ActivityIndicator size="small" color="#4A7C59" />
-          ) : (
-            <Text style={{ 
-              color: saving ? '#999' : '#4A7C59', 
-              fontSize: 16, 
-              fontWeight: '600' 
-            }}>Save</Text>
-          )}
-        </TouchableOpacity>
-      )
-    });
-  }, [navigation, saving, loading]);
-
-  // Load user data on mount
-  useEffect(() => {
-    const loadUserData = async () => {
-      if (!user) return;
-      
-      
-      try {
-        setLoading(true);
-        const userDoc = await getDoc(doc(db, 'users', user.uid));
-        
-        if (userDoc.exists()) {
-          const userData = userDoc.data();
-          setFirstName(userData.firstName || "");
-          setLastName(userData.lastName || "");
-          setUsername(userData.username || user.email?.split('@')[0] || "");
-          setSchool(userData.school || "");
-          setBio(userData.bio || "");
-          setProfilePictureUrl(userData.profilePictureUrl || "");
-        } else {
-          // If no user document exists, create one with basic info
-          setFirstName(user.displayName?.split(' ')[0] || "");
-          setLastName(user.displayName?.split(' ').slice(1).join(' ') || "");
-          setUsername(user.email?.split('@')[0] || "");
-        }
-      } catch (error) {
-        console.error('Error loading user data:', error);
-        Alert.alert("Error", "Failed to load profile data.");
-      } finally {
-        setLoading(false);
-      }
-    };
-
-    loadUserData();
-  }, []); // Only run once on mount
-
-  const handleSave = async () => {
+  const handleSave = useCallback(async () => {
     if (!user) {
       Alert.alert("Error", "You must be logged in to edit your profile.");
       return;
@@ -146,8 +87,66 @@ export default function EditProfile() {
     } finally {
       setSaving(false);
     }
-  };
+  }, [user, firstName, lastName, username, school, bio, navigation]);
 
+  // Set up dynamic header with save button
+  useEffect(() => {
+    navigation.setOptions({
+      headerTintColor: '#000000', // Black back button
+      headerRight: () => (
+        <TouchableOpacity 
+          style={{ marginRight: 10 }}
+          onPress={handleSave}
+          disabled={saving}
+        >
+          {saving ? (
+            <ActivityIndicator size="small" color="#4A7C59" />
+          ) : (
+            <Text style={{ 
+              color: saving ? '#999' : '#4A7C59', 
+              fontSize: 16, 
+              fontWeight: '600' 
+            }}>Save</Text>
+          )}
+        </TouchableOpacity>
+      )
+    });
+  }, [navigation, saving, loading, handleSave]);
+
+  // Load user data on mount
+  useEffect(() => {
+    const loadUserData = async () => {
+      if (!user) return;
+      
+      
+      try {
+        setLoading(true);
+        const userDoc = await getDoc(doc(db, 'users', user.uid));
+        
+        if (userDoc.exists()) {
+          const userData = userDoc.data();
+          setFirstName(userData.firstName || "");
+          setLastName(userData.lastName || "");
+          setUsername(userData.username || user.email?.split('@')[0] || "");
+          setSchool(userData.school || "");
+          setBio(userData.bio || "");
+          setProfilePictureUrl(userData.profilePictureUrl || "");
+        } else {
+          // If no user document exists, create one with basic info
+          setFirstName(user.displayName?.split(' ')[0] || "");
+          setLastName(user.displayName?.split(' ').slice(1).join(' ') || "");
+          setUsername(user.email?.split('@')[0] || "");
+        }
+      } catch (error) {
+        console.error('Error loading user data:', error);
+        Alert.alert("Error", "Failed to load profile data.");
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadUserData();
+  }, []); // Only run once on mount
 
   const handleImagePicker = () => {
     Alert.alert(
