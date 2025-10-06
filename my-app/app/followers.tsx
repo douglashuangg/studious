@@ -1,9 +1,10 @@
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { getFollowers, followUser, unfollowUser, isFollowing } from "../firebase/followService";
+import React from 'react';
 
 interface Follower {
   id: string;
@@ -19,42 +20,49 @@ interface Follower {
 export default function Followers() {
   const route = useRoute();
   const navigation = useNavigation();
-  const { userId, returnTo, originalReturnTo } = route.params || {};
+  const { userId, returnTo, originalReturnTo } = (route.params as any) || {};
   const { user } = useAuth();
   const [followers, setFollowers] = useState<Follower[]>([]);
   const [loading, setLoading] = useState(true);
   const [followingStatus, setFollowingStatus] = useState<{[key: string]: boolean}>({});
   const [targetUserId, setTargetUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchFollowers = async () => {
-      if (!user) return;
+  const fetchFollowers = async () => {
+    if (!user) return;
+    
+    // Determine which user's followers to show
+    const targetUser = userId as string || user.uid;
+    setTargetUserId(targetUser);
+    
+    try {
+      setLoading(true);
+      const followersData = await getFollowers(targetUser);
+      setFollowers(followersData);
       
-      // Determine which user's followers to show
-      const targetUser = userId as string || user.uid;
-      setTargetUserId(targetUser);
-      
-      try {
-        setLoading(true);
-        const followersData = await getFollowers(targetUser);
-        setFollowers(followersData);
-        
-        // Check follow status for each follower
-        const statusMap: { [key: string]: boolean } = {};
-        for (const follower of followersData) {
-          const isFollowingUser = await isFollowing(user.uid, follower.id);
-          statusMap[follower.id as string] = isFollowingUser;
-        }
-        setFollowingStatus(statusMap);
-      } catch (error) {
-        console.error('Error fetching followers:', error);
-      } finally {
-        setLoading(false);
+      // Check follow status for each follower
+      const statusMap: { [key: string]: boolean } = {};
+      for (const follower of followersData) {
+        const isFollowingUser = await isFollowing(user.uid, follower.id);
+        statusMap[follower.id as string] = isFollowingUser;
       }
-    };
+      setFollowingStatus(statusMap);
+    } catch (error) {
+      console.error('Error fetching followers:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchFollowers();
   }, [user, userId]);
+
+  // Refresh followers when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchFollowers();
+    }, [user, userId])
+  );
 
   const handleFollowToggle = async (followerId: string) => {
     if (!user) return;

@@ -1,9 +1,10 @@
 import { View, Text, StyleSheet, FlatList, Image, TouchableOpacity, ActivityIndicator } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
-import { useRoute, useNavigation } from '@react-navigation/native';
+import { useRoute, useNavigation, useFocusEffect } from '@react-navigation/native';
 import { useState, useEffect } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { getFollowing, unfollowUser } from "../firebase/followService";
+import React from 'react';
 
 interface FollowingUser {
   id: string;
@@ -19,33 +20,40 @@ interface FollowingUser {
 export default function Following() {
   const route = useRoute();
   const navigation = useNavigation();
-  const { userId, returnTo, originalReturnTo } = route.params || {};
+  const { userId, returnTo, originalReturnTo } = (route.params as any) || {};
   const { user } = useAuth();
   const [following, setFollowing] = useState<FollowingUser[]>([]);
   const [loading, setLoading] = useState(true);
   const [targetUserId, setTargetUserId] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchFollowing = async () => {
-      if (!user) return;
-      
-      // Determine which user's following to show
-      const targetUser = userId as string || user.uid;
-      setTargetUserId(targetUser);
-      
-      try {
-        setLoading(true);
-        const followingData = await getFollowing(targetUser);
-        setFollowing(followingData);
-      } catch (error) {
-        console.error('Error fetching following:', error);
-      } finally {
-        setLoading(false);
-      }
-    };
+  const fetchFollowing = async () => {
+    if (!user) return;
+    
+    // Determine which user's following to show
+    const targetUser = userId as string || user.uid;
+    setTargetUserId(targetUser);
+    
+    try {
+      setLoading(true);
+      const followingData = await getFollowing(targetUser);
+      setFollowing(followingData);
+    } catch (error) {
+      console.error('Error fetching following:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
 
+  useEffect(() => {
     fetchFollowing();
   }, [user, userId]);
+
+  // Refresh following when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      fetchFollowing();
+    }, [user, userId])
+  );
 
   const handleUnfollow = async (userId: string) => {
     if (!user) return;

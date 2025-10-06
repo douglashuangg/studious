@@ -7,7 +7,7 @@ import { getStudySessions } from "../firebase/studySessionService";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/firebaseInit";
-import { getFollowCounts } from "../firebase/followService";
+import { getFollowCounts, getFollowers, getFollowing } from "../firebase/followService";
 import { generateSocialDailySummaries } from "../firebase/dailySummaryService";
 import { useFocusEffect } from '@react-navigation/native';
 import { useLikes } from "../hooks/useLikes";
@@ -25,6 +25,8 @@ export default function Profile() {
   const [streakDays, setStreakDays] = useState(0);
   const [userProfile, setUserProfile] = useState<any>(null);
   const [followCounts, setFollowCounts] = useState({ followerCount: 0, followingCount: 0 });
+  const [followers, setFollowers] = useState<any[]>([]);
+  const [following, setFollowing] = useState<any[]>([]);
   const [userPosts, setUserPosts] = useState<any[]>([]);
   const [postsLoading, setPostsLoading] = useState(true);
   const [expandedPost, setExpandedPost] = useState<string | null>(null);
@@ -76,6 +78,14 @@ export default function Profile() {
           // Fetch follow counts
           const counts = await getFollowCounts(user.uid);
           setFollowCounts(counts);
+          
+          // Fetch followers and following lists
+          const [followersData, followingData] = await Promise.all([
+            getFollowers(user.uid, 50),
+            getFollowing(user.uid, 50)
+          ]);
+          setFollowers(followersData);
+          setFollowing(followingData);
         }
         
         setLoading(false);
@@ -96,15 +106,24 @@ export default function Profile() {
       const reloadProfileData = async () => {
         if (user) {
           try {
+            // Refresh user profile data
             const userDoc = await getDoc(doc(db, 'users', user.uid));
             if (userDoc.exists()) {
               const profileData = userDoc.data();
               setUserProfile(profileData);
             }
             
-            // Also refresh follow counts
+            // Refresh follow counts
             const counts = await getFollowCounts(user.uid);
             setFollowCounts(counts);
+            
+            // Refresh followers and following lists
+            const [followersData, followingData] = await Promise.all([
+              getFollowers(user.uid, 50),
+              getFollowing(user.uid, 50)
+            ]);
+            setFollowers(followersData);
+            setFollowing(followingData);
           } catch (error) {
             console.error('Error reloading profile data:', error);
           }
