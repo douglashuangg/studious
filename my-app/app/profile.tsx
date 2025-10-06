@@ -531,7 +531,16 @@ export default function Profile() {
               </View>
               
               {summary.totalStudyTime > 0 ? (
-                <>
+                <TouchableOpacity 
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    // Navigate to post detail screen
+                    navigation.navigate('PostDetail', { 
+                      postId: `${summary.userId}-${summary.date}`,
+                      postTitle: "Your Study Day"
+                    });
+                  }}
+                >
                   <View style={styles.summaryContent}>
                     <Text style={styles.summaryTitle}>
                       Studied for <Text style={styles.highlightText}>{formatTimeForDisplay(summary.totalStudyTime)}</Text> across <Text style={styles.highlightText}>{summary.sessionCount} sessions</Text>
@@ -615,7 +624,7 @@ export default function Profile() {
                       </Text>
                     </TouchableOpacity>
                   )}
-                </>
+                </TouchableOpacity>
               ) : (
                 <View style={styles.noStudyContainer}>
                   <Ionicons name="book-outline" size={32} color="#E5E5EA" />

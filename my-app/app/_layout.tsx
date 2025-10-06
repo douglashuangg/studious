@@ -30,6 +30,7 @@ import ExternalUserProfileScreen from './user-profile/external-user-profile';
 import NotificationsScreen from './notifications';
 import EditProfileScreen from './edit-profile';
 import StatisticsScreen from './statistics';
+import PostDetailScreen from './post-detail';
 
 const Tab = createBottomTabNavigator();
 const Stack = createNativeStackNavigator();
@@ -118,6 +119,14 @@ function MainStack() {
         options={{ 
           headerShown: true,
           title: "Following" 
+        }}
+      />
+      <Stack.Screen 
+        name="PostDetail" 
+        component={PostDetailScreen} 
+        options={{ 
+          headerShown: false,
+          title: "Post Details"
         }}
       />
     </Stack.Navigator>

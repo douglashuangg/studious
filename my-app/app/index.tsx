@@ -280,6 +280,7 @@ export default function Index() {
     setSelectedPostTitle(null);
   };
 
+
   const onRefresh = async () => {
     setRefreshing(true);
     
@@ -529,18 +530,21 @@ export default function Index() {
           </View>
         ) : (
           dailySummaries.map((summary, index) => (
-            <TouchableOpacity 
+            <View 
               key={`${summary.userId}-${summary.date}`} 
               style={styles.summaryCard}
-              activeOpacity={1}
-              onPress={() => {
-                if (!summary.userProfile?.isOwn) {
-                  navigation.navigate('ExternalUserProfile', { id: summary.userId });
-                }
-              }}
             >
               <View style={styles.summaryHeader}>
-                <View style={styles.summaryUserInfo}>
+                <TouchableOpacity 
+                  style={styles.summaryUserInfo}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    // Navigate to user profile
+                    if (!summary.userProfile?.isOwn) {
+                      navigation.navigate('ExternalUserProfile', { id: summary.userId });
+                    }
+                  }}
+                >
                   {summary.userProfile?.profilePicture ? (
                     <Image 
                       source={{ uri: summary.userProfile.profilePicture }} 
@@ -570,7 +574,7 @@ export default function Index() {
                        new Date(summary.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                     </Text>
                   </View>
-                </View>
+                </TouchableOpacity>
                 {summary.totalStudyTime > 0 && (
                   <View style={styles.streakBadge}>
                     <Ionicons name="flame" size={16} color="#FF6B35" />
@@ -580,7 +584,16 @@ export default function Index() {
               </View>
               
               {summary.totalStudyTime > 0 ? (
-                <>
+                <TouchableOpacity 
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    // Navigate to post detail screen
+                    navigation.navigate('PostDetail', { 
+                      postId: `${summary.userId}-${summary.date}`,
+                      postTitle: `${summary.userProfile?.displayName || 'User'}'s Study Day`
+                    });
+                  }}
+                >
                   <View style={styles.summaryContent}>
                     <Text style={styles.summaryTitle}>
                       Studied for <Text style={styles.highlightText}>{formatTimeForDisplay(summary.totalStudyTime)}</Text> across <Text style={styles.highlightText}>{summary.sessionCount} sessions</Text>
@@ -666,14 +679,14 @@ export default function Index() {
                       </Text>
                     </TouchableOpacity>
                   )}
-                </>
+                </TouchableOpacity>
               ) : (
                 <View style={styles.noStudyContainer}>
                   <Ionicons name="book-outline" size={32} color="#E5E5EA" />
                   <Text style={styles.noStudyText}>No study time recorded</Text>
                 </View>
               )}
-            </TouchableOpacity>
+            </View>
           ))
         )}
       </View>
