@@ -12,6 +12,7 @@ import { generateSocialDailySummaries } from "../firebase/dailySummaryService";
 import { useFocusEffect } from '@react-navigation/native';
 import { useLikes } from "../hooks/useLikes";
 import LikersModal from "../components/LikersModal";
+import { APP_CONFIG } from "../config/appConfig";
 import React from 'react';
 
 export default function Profile() {
@@ -309,11 +310,15 @@ export default function Profile() {
     );
   };
   return (
-    <ScrollView style={styles.container} showsVerticalScrollIndicator={false}>
+    <View style={styles.container}>
       {/* Alpha Header */}
-      <View style={styles.betaContainer}>
-        <Text style={styles.betaText}>ALPHA v0.1.0</Text>
-      </View>
+      {APP_CONFIG.showAlphaBadge && (
+        <View style={[styles.betaContainer, { marginTop: insets.top }]}>
+            <Text style={styles.betaText}>ALPHA v0.1.0</Text>
+        </View>
+      )}
+
+      <ScrollView style={styles.scrollContainer} showsVerticalScrollIndicator={false}>
 
       {/* Header with Profile Picture and Followers/Following */}
       <View style={styles.header}>
@@ -637,6 +642,8 @@ export default function Profile() {
         )}
       </View>
       
+      </ScrollView>
+      
       {/* Likers Modal */}
       <LikersModal
         visible={likersModalVisible}
@@ -644,7 +651,7 @@ export default function Profile() {
         postId={selectedPostId || ''}
         postTitle={selectedPostTitle || undefined}
       />
-    </ScrollView>
+    </View>
   );
 }
 
@@ -652,6 +659,9 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: "#f8f9fa",
+  },
+  scrollContainer: {
+    flex: 1,
   },
   header: {
     alignItems: "center",

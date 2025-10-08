@@ -18,6 +18,7 @@ import {
   setCurrentlyStudying, 
   removeCurrentlyStudying 
 } from "../firebase/currentlyStudyingService.js";
+import { APP_CONFIG, COLORS } from "../config/appConfig";
 
 export default function Record() {
   const insets = useSafeAreaInsets();
@@ -223,7 +224,7 @@ export default function Record() {
     // Update currently studying status with pause state
     if (user) {
       try {
-        await setCurrentlyStudying(user.uid, subject, sessionStartTime.getTime(), notes, newPausedState, 0);
+        await setCurrentlyStudying(user.uid, subject, sessionStartTime?.getTime() || 0, notes, newPausedState, 0);
       } catch (error) {
         console.error('❌ Error updating currently studying status:', error);
       }
@@ -375,24 +376,29 @@ export default function Record() {
       behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
       keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 20}
     >
+    {APP_CONFIG.showAlphaBadge && (
+      <View style={[styles.betaContainer, { marginTop: insets.top }]}>
+          <Text style={styles.betaText}>ALPHA v0.1.0</Text>
+      </View>
+    )}
+      <PageHeader 
+        title="Focus Timer"
+        right={<View style={{ width: 24 }} />}
+        showAlphaBadge={APP_CONFIG.showAlphaBadge}
+      />
+      <View style={styles.headerDecoration} />
+
       <ScrollView 
         style={styles.scrollContainer}
         contentContainerStyle={styles.scrollContent}
         keyboardShouldPersistTaps="handled"
         showsVerticalScrollIndicator={false}
       >
-        <PageHeader 
-          title="Focus Timer"
-          right={<View style={{ width: 24 }} />}
-        />
-
-        {/* Modern Header with Gradient */}
-        <View style={styles.header}>
+        {/* <View style={styles.header}>
           <View style={styles.headerContent}>
             <Text style={styles.subtitle}>Deep work sessions</Text>
           </View>
-          <View style={styles.headerDecoration} />
-        </View>
+        </View> */}
 
         {/* Main Timer Section */}
         <View style={styles.timerSection}>
@@ -713,12 +719,9 @@ const styles = StyleSheet.create({
     zIndex: 2,
   },
   headerDecoration: {
-    position: "absolute",
-    top: 0,
-    left: 0,
-    right: 0,
     height: 4,
     backgroundColor: "#2D5A27",
+    width: "100%",
   },
   title: {
     fontSize: 32,

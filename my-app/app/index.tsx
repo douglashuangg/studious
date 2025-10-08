@@ -12,6 +12,7 @@ import { useLikes } from "../hooks/useLikes";
 import { formatCurrentlyStudyingForHomePage } from "../utils/currentlyStudyingUtils";
 import { generateSocialDailySummaries } from "../firebase/dailySummaryService.js";
 import LikersModal from "../components/LikersModal";
+import { APP_CONFIG, COLORS } from "../config/appConfig";
 
 export default function Index() {
   const insets = useSafeAreaInsets();
@@ -363,31 +364,18 @@ export default function Index() {
   };
 
   return (
-    <ScrollView 
-      style={styles.container}
-      contentInsetAdjustmentBehavior="automatic"
-      showsVerticalScrollIndicator={false}
-      refreshControl={
-        <RefreshControl
-          refreshing={refreshing}
-          onRefresh={onRefresh}
-          tintColor="#4A7C59"
-          colors={["#4A7C59", "#007AFF"]}
-          title="Pull to refresh"
-          titleColor="#666"
-          progressBackgroundColor="#ffffff"
-        />
-      }
-    >
+    <View style={styles.container}>
       {/* Alpha Badge */}
-      <View style={[styles.betaContainer, { marginTop: insets.top }]}>
-          <Text style={styles.betaText}>ALPHA v0.1.0</Text>
-      </View>
+      {APP_CONFIG.showAlphaBadge && (
+        <View style={[styles.betaContainer, { marginTop: insets.top }]}>
+            <Text style={styles.betaText}>ALPHA v0.1.0</Text>
+        </View>
+      )}
 
       {/* Top Header with Notifications */}
       <View style={styles.topHeader}>
         <View style={styles.topHeaderLeft}>
-          <Text style={styles.appTitle}>Studious</Text>
+          <Text style={styles.appTitle}>Home</Text>
         </View>
         <View style={styles.headerButtons}>
             <TouchableOpacity style={styles.searchButton} onPress={() => navigation.navigate('Search')}>
@@ -403,6 +391,26 @@ export default function Index() {
           </TouchableOpacity>
         </View>
       </View>
+
+      {/* Header Decoration */}
+      <View style={styles.headerDecoration} />
+
+      <ScrollView 
+        style={styles.scrollContainer}
+        contentInsetAdjustmentBehavior="automatic"
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            tintColor="#4A7C59"
+            colors={["#4A7C59", "#007AFF"]}
+            title="Pull to refresh"
+            titleColor={COLORS.textSecondary}
+            progressBackgroundColor={COLORS.white}
+          />
+        }
+      >
 
       {/* Stories Section */}
       <View style={styles.storiesContainer}>
@@ -654,6 +662,8 @@ export default function Index() {
         )}
       </View>
       
+      </ScrollView>
+      
       {/* Likers Modal */}
       <LikersModal
         visible={likersModalVisible}
@@ -661,25 +671,33 @@ export default function Index() {
         postId={selectedPostId || ''}
         postTitle={selectedPostTitle || undefined}
       />
-    </ScrollView>
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: COLORS.surface,
+  },
+  scrollContainer: {
+    flex: 1,
+  },
+  headerDecoration: {
+    height: 4,
+    backgroundColor: "#2D5A27",
+    width: "100%",
   },
   header: {
     alignItems: "center",
     paddingVertical: 20,
     paddingHorizontal: 20,
-    backgroundColor: "#ffffff",
+    backgroundColor: COLORS.white,
   },
   title: {
     fontSize: 28,
     fontWeight: "bold",
-    color: "#000",
+    color: COLORS.text,
     marginBottom: 5,
   },
   storiesContainer: {
@@ -1024,9 +1042,9 @@ const styles = StyleSheet.create({
     alignItems: "center",
     paddingHorizontal: 20,
     paddingVertical: 15,
-    backgroundColor: "#ffffff",
+    backgroundColor: COLORS.white,
     borderBottomWidth: 1,
-    borderBottomColor: "#E5E5EA",
+    borderBottomColor: COLORS.border,
   },
   topHeaderLeft: {
     flex: 1,
@@ -1034,7 +1052,7 @@ const styles = StyleSheet.create({
   appTitle: {
     fontSize: 24,
     fontWeight: "bold",
-    color: "#000",
+    color: COLORS.text,
   },
   topHeaderRight: {
     flexDirection: "row",

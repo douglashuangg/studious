@@ -5,6 +5,7 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect, useRef } from "react";
 import { saveStudySession } from "../firebase/studySessionService.js";
+import { APP_CONFIG, COLORS } from "../config/appConfig";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
@@ -358,10 +359,19 @@ export default function Calendar() {
 
   return (
     <View style={styles.container}>
+      {APP_CONFIG.showAlphaBadge && (
+        <View style={[styles.betaContainer, { marginTop: insets.top }]}>
+          <Text style={styles.betaText}>ALPHA v0.1.0</Text>
+        </View>
+      )}
       <PageHeader 
         title="Study Calendar"
         right={<View style={{ width: 24 }} />}
+        showAlphaBadge={APP_CONFIG.showAlphaBadge}
       />
+
+      {/* Header Decoration */}
+      <View style={styles.headerDecoration} />
 
       {/* Calendar Header */}
       <View style={styles.calendarHeader}>
@@ -632,7 +642,12 @@ export default function Calendar() {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: "#f8f9fa",
+    backgroundColor: COLORS.surface,
+  },
+  headerDecoration: {
+    height: 4,
+    backgroundColor: "#2D5A27",
+    width: "100%",
   },
   // Calendar styles
   calendarHeader: {

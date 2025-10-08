@@ -100,6 +100,21 @@ export const getUserPosts = async (userId, limitCount = 10) => {
       });
     });
 
+    // Fetch current user profile to get updated profile picture
+    const userDoc = await getDoc(doc(db, 'users', userId));
+    const userData = userDoc.exists() ? userDoc.data() : null;
+    
+    // Update profile pictures in all posts with current data
+    if (userData) {
+      posts.forEach(post => {
+        if (post.userProfile) {
+          post.userProfile.profilePicture = userData.profilePictureUrl || null;
+          post.userProfile.displayName = userData.displayName || post.userProfile.displayName;
+          post.userProfile.username = userData.username || post.userProfile.username;
+        }
+      });
+    }
+
     return posts;
   } catch (error) {
     console.error('❌ Error getting user posts:', error);
