@@ -1,14 +1,106 @@
-import { Text, View, StyleSheet, ScrollView, TouchableOpacity, Image } from "react-native";
+import { Text, View, StyleSheet, ScrollView, TouchableOpacity, Image, Alert } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useNavigation } from '@react-navigation/native';
+import { useState, useEffect } from 'react';
+import { 
+  scheduleLocalNotification, 
+  scheduleStudyReminder, 
+  scheduleAchievementNotification,
+  getNotificationBadgeCount,
+  setNotificationBadgeCount
+} from '../firebase/notificationService';
+import { scheduleFollowNotification } from '../firebase/notificationService';
+import { doc, getDoc, setDoc, updateDoc, collection, query, where, getDocs, orderBy } from 'firebase/firestore';
+import { db } from '../firebase/firebaseInit';
+import { useAuth } from '../contexts/AuthContext';
 
 export default function Notifications() {
   const insets = useSafeAreaInsets();
   const navigation = useNavigation();
+  const { user } = useAuth();
+  const [notifications, setNotifications] = useState<any[]>([]);
+  const [badgeCount, setBadgeCount] = useState(0);
+  const [loading, setLoading] = useState(true);
 
-  // No notifications for now
-  const notifications: any[] = [];
+  useEffect(() => {
+    loadBadgeCount();
+    loadNotifications();
+    // Mark all notifications as read when notifications page is opened
+    markAllAsRead();
+  }, [user]);
+
+  const loadNotifications = async () => {
+    if (!user) return;
+    
+    try {
+      setLoading(true);
+      // Get user's notifications from Firestore
+      const notificationsQuery = query(
+        collection(db, 'notifications'),
+        where('userId', '==', user.uid),
+        orderBy('createdAt', 'desc')
+      );
+      const notificationsSnapshot = await getDocs(notificationsQuery);
+      const notificationsData = notificationsSnapshot.docs.map(doc => ({
+        id: doc.id,
+        ...doc.data()
+      }));
+      setNotifications(notificationsData);
+    } catch (error) {
+      console.error('Error loading notifications:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const loadBadgeCount = async () => {
+    try {
+      const count = await getNotificationBadgeCount();
+      setBadgeCount(count);
+    } catch (error) {
+      console.error('Error loading badge count:', error);
+    }
+  };
+
+  const clearBadge = async () => {
+    try {
+      await setNotificationBadgeCount(0);
+      setBadgeCount(0);
+    } catch (error) {
+      console.error('Error clearing badge:', error);
+    }
+  };
+
+  const markAllAsRead = async () => {
+    if (!user) return;
+    
+    try {
+      // Mark all unread notifications as read
+      const notificationsQuery = query(
+        collection(db, 'notifications'),
+        where('userId', '==', user.uid),
+        where('isRead', '==', false)
+      );
+      const notificationsSnapshot = await getDocs(notificationsQuery);
+      
+      const updatePromises = notificationsSnapshot.docs.map(doc => 
+        updateDoc(doc.ref, { isRead: true })
+      );
+      
+      await Promise.all(updatePromises);
+      
+      // Clear badge count
+      await setNotificationBadgeCount(0);
+      setBadgeCount(0);
+      
+      // Reload notifications
+      await loadNotifications();
+    } catch (error) {
+      console.error('Error marking notifications as read:', error);
+    }
+  };
+
 
   const getNotificationIcon = (type: string) => {
     switch (type) {

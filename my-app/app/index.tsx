@@ -1,8 +1,8 @@
 import { Text, View, StyleSheet, ScrollView, Image, TouchableOpacity, ActivityIndicator, RefreshControl } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
-import { useNavigation } from '@react-navigation/native';
-import { useState, useEffect } from "react";
+import { useNavigation, useFocusEffect } from '@react-navigation/native';
+import React, { useState, useEffect } from "react";
 import * as Haptics from "expo-haptics";
 import { collection, query, where, getDocs, orderBy } from "firebase/firestore";
 import { db } from "../firebase/firebaseInit";
@@ -12,6 +12,7 @@ import { useLikes } from "../hooks/useLikes";
 import { formatCurrentlyStudyingForHomePage } from "../utils/currentlyStudyingUtils";
 import { generateSocialDailySummaries } from "../firebase/dailySummaryService.js";
 import LikersModal from "../components/LikersModal";
+import { getNotificationBadgeCount } from "../firebase/notificationService";
 import { APP_CONFIG, COLORS } from "../config/appConfig";
 
 export default function Index() {
@@ -42,6 +43,7 @@ export default function Index() {
   const [likersModalVisible, setLikersModalVisible] = useState(false);
   const [selectedPostId, setSelectedPostId] = useState<string | null>(null);
   const [selectedPostTitle, setSelectedPostTitle] = useState<string | null>(null);
+  const [badgeCount, setBadgeCount] = useState(0);
   
   // Get post IDs for likes tracking
   const postIds = dailySummaries.map(summary => `${summary.userId}-${summary.date}`);
@@ -145,7 +147,24 @@ export default function Index() {
 
     loadUserStats();
     loadDailySummaries();
+    loadBadgeCount();
   }, [user]);
+
+  const loadBadgeCount = async () => {
+    try {
+      const count = await getNotificationBadgeCount();
+      setBadgeCount(count);
+    } catch (error) {
+      console.error('Error loading badge count:', error);
+    }
+  };
+
+  // Refresh badge count when screen comes into focus
+  useFocusEffect(
+    React.useCallback(() => {
+      loadBadgeCount();
+    }, [])
+  );
 
   // Calculate study streak
   const calculateStreak = (sessions: any[]) => {
@@ -261,6 +280,7 @@ export default function Index() {
     setSelectedPostId(null);
     setSelectedPostTitle(null);
   };
+
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -388,6 +408,11 @@ export default function Index() {
             onPress={() => navigation.navigate('Notifications')}
           >
             <Ionicons name="notifications-outline" size={24} color="#4A7C59" />
+            {badgeCount > 0 && (
+              <View style={styles.badge}>
+                <Text style={styles.badgeText}>{badgeCount > 99 ? '99+' : badgeCount}</Text>
+              </View>
+            )}
           </TouchableOpacity>
         </View>
       </View>
@@ -513,18 +538,21 @@ export default function Index() {
           </View>
         ) : (
           dailySummaries.map((summary, index) => (
-            <TouchableOpacity 
+            <View 
               key={`${summary.userId}-${summary.date}`} 
               style={styles.summaryCard}
-              activeOpacity={1}
-              onPress={() => {
-                if (!summary.userProfile?.isOwn) {
-                  navigation.navigate('ExternalUserProfile', { id: summary.userId });
-                }
-              }}
             >
               <View style={styles.summaryHeader}>
-                <View style={styles.summaryUserInfo}>
+                <TouchableOpacity 
+                  style={styles.summaryUserInfo}
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    // Navigate to user profile
+                    if (!summary.userProfile?.isOwn) {
+                      navigation.navigate('ExternalUserProfile', { id: summary.userId });
+                    }
+                  }}
+                >
                   {summary.userProfile?.profilePicture ? (
                     <Image 
                       source={{ uri: summary.userProfile.profilePicture }} 
@@ -554,7 +582,7 @@ export default function Index() {
                        new Date(summary.date).toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' })}
                     </Text>
                   </View>
-                </View>
+                </TouchableOpacity>
                 {summary.totalStudyTime > 0 && (
                   <View style={styles.streakBadge}>
                     <Ionicons name="flame" size={16} color="#FF6B35" />
@@ -564,7 +592,16 @@ export default function Index() {
               </View>
               
               {summary.totalStudyTime > 0 ? (
-                <>
+                <TouchableOpacity 
+                  activeOpacity={0.7}
+                  onPress={() => {
+                    // Navigate to post detail screen
+                    navigation.navigate('PostDetail', { 
+                      postId: `${summary.userId}-${summary.date}`,
+                      postTitle: `${summary.userProfile?.displayName || 'User'}'s Study Day`
+                    });
+                  }}
+                >
                   <View style={styles.summaryContent}>
                     <Text style={styles.summaryTitle}>
                       Studied for <Text style={styles.highlightText}>{formatTimeForDisplay(summary.totalStudyTime)}</Text> across <Text style={styles.highlightText}>{summary.sessionCount} sessions</Text>
@@ -650,14 +687,14 @@ export default function Index() {
                       </Text>
                     </TouchableOpacity>
                   )}
-                </>
+                </TouchableOpacity>
               ) : (
                 <View style={styles.noStudyContainer}>
                   <Ionicons name="book-outline" size={32} color="#E5E5EA" />
                   <Text style={styles.noStudyText}>No study time recorded</Text>
                 </View>
               )}
-            </TouchableOpacity>
+            </View>
           ))
         )}
       </View>
@@ -1060,6 +1097,24 @@ const styles = StyleSheet.create({
   },
   topNotificationButton: {
     padding: 8,
+    position: 'relative',
+  },
+  badge: {
+    position: 'absolute',
+    top: 2,
+    right: 2,
+    backgroundColor: '#FF3B30',
+    borderRadius: 10,
+    minWidth: 20,
+    height: 20,
+    justifyContent: 'center',
+    alignItems: 'center',
+    paddingHorizontal: 6,
+  },
+  badgeText: {
+    color: '#FFFFFF',
+    fontSize: 12,
+    fontWeight: '600',
   },
   // Additional styles for real daily summaries
   emptyContainer: {

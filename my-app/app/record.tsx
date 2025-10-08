@@ -222,7 +222,7 @@ export default function Record() {
     }
 
     // Update currently studying status with pause state
-    if (user) {
+    if (user && sessionStartTime) {
       try {
         await setCurrentlyStudying(user.uid, subject, sessionStartTime?.getTime() || 0, notes, newPausedState, 0);
       } catch (error) {
@@ -251,7 +251,7 @@ export default function Record() {
                 const sessionEndTime = new Date();
                 const sessionData = {
                   subject: subject,
-                  startTime: sessionStartTime,
+                  startTime: sessionStartTime || new Date(),
                   endTime: sessionEndTime,
                   duration: formatTime(seconds),
                   notes: notes,
@@ -259,7 +259,11 @@ export default function Record() {
                   color: "#2D5A27"
                 };
                 
-                await saveStudySession(sessionData);
+                // Run session save and currently studying removal in parallel for better performance
+                await Promise.all([
+                  saveStudySession(sessionData),
+                  user ? removeCurrentlyStudying(user.uid) : Promise.resolve()
+                ]);
                 Alert.alert("Success", "Study session saved successfully!");
               } catch (error) {
                 console.error("Error saving session:", error);
@@ -290,15 +294,6 @@ export default function Record() {
   };
 
   const resetSession = async () => {
-    // Remove user from currently studying status
-    if (user) {
-      try {
-        await removeCurrentlyStudying(user.uid);
-      } catch (error) {
-        console.error('❌ Error removing currently studying status:', error);
-      }
-    }
-
     setIsRecording(false);
     setIsPaused(false);
     setSeconds(0);
