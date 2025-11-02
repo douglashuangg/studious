@@ -7,3 +7,8 @@ strava but for studying!
 * study at the same time together
 
 currently in development
+
+
+tech stack:
+* react-native
+* firebase
