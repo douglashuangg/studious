@@ -1,23 +1,27 @@
 rules_version = '2';
 service cloud.firestore {
   match /databases/{database}/documents {
-    // Users can read and write their own user document
+    // Users can read all user documents (for social features), write their own user document
     match /users/{userId} {
-      allow read, write: if request.auth != null && request.auth.uid == userId;
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
     
     // Follow relationships - users can create/delete their own follows
     match /follows/{followId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && 
-        request.auth.uid == resource.data.followerId;
+        request.auth.uid == request.resource.data.followerId;
       allow delete: if request.auth != null && 
         request.auth.uid == resource.data.followerId;
     }
     
-    // Study sessions - users can read/write their own sessions
+    // Study sessions - users can read all sessions (for social features), write their own sessions
     match /studySessions/{sessionId} {
-      allow read, write: if request.auth != null && 
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.userId;
+      allow update, delete: if request.auth != null && 
         request.auth.uid == resource.data.userId;
     }
     
@@ -25,9 +29,33 @@ service cloud.firestore {
     match /likes/{likeId} {
       allow read: if request.auth != null;
       allow create: if request.auth != null && 
-        request.auth.uid == resource.data.userId;
+        request.auth.uid == request.resource.data.userId;
       allow delete: if request.auth != null && 
         request.auth.uid == resource.data.userId;
+    }
+    
+    // Posts - users can read all posts, write their own posts
+    match /posts/{postId} {
+      allow read: if request.auth != null;
+      allow create: if request.auth != null && 
+        request.auth.uid == request.resource.data.userId;
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+    }
+    
+    // Notifications - users can read their own notifications, write to others' notifications
+    match /notifications/{notificationId} {
+      allow read: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+      allow create: if request.auth != null;
+      allow update: if request.auth != null && 
+        request.auth.uid == resource.data.userId;
+    }
+    
+    // Currently studying - users can read all statuses (for social features), write their own status
+    match /currentlyStudying/{userId} {
+      allow read: if request.auth != null;
+      allow write: if request.auth != null && request.auth.uid == userId;
     }
   }
 }

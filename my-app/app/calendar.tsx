@@ -5,12 +5,15 @@ import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from "@expo/vector-icons";
 import React, { useState, useEffect, useRef } from "react";
 import { saveStudySession } from "../firebase/studySessionService.js";
+import { removeCurrentlyStudying } from "../firebase/currentlyStudyingService.js";
+import { useAuth } from "../contexts/AuthContext";
 import { APP_CONFIG, COLORS } from "../config/appConfig";
 
 const { height: screenHeight, width: screenWidth } = Dimensions.get('window');
 
 export default function Calendar() {
   const insets = useSafeAreaInsets();
+  const { user } = useAuth();
   // Recording states
   const [isRecording, setIsRecording] = useState(false);
   const [isPaused, setIsPaused] = useState(false);
@@ -221,8 +224,16 @@ export default function Calendar() {
           },
           {
             text: "Discard",
-          onPress: () => {
+          onPress: async () => {
             Alert.alert("Discarded", "Study session discarded.");
+            // Remove currently studying status when discarding
+            if (user) {
+              try {
+                await removeCurrentlyStudying(user.uid);
+              } catch (error) {
+                console.error('Error removing currently studying status:', error);
+              }
+            }
             resetSession();
           },
             style: "destructive"

@@ -9,6 +9,7 @@ import { doc, getDoc } from "firebase/firestore";
 import { db } from "../firebase/firebaseInit";
 import { getFollowCounts, getFollowers, getFollowing } from "../firebase/followService";
 import { generateSocialDailySummaries } from "../firebase/dailySummaryService";
+import { SafeProfileImage } from "../components/SafeProfileImage";
 import { useFocusEffect } from '@react-navigation/native';
 import { useLikes } from "../hooks/useLikes";
 import LikersModal from "../components/LikersModal";
@@ -133,6 +134,7 @@ export default function Profile() {
       reloadProfileData();
     }, [user])
   );
+
 
   const calculateStats = (sessions: any[]) => {
     let totalHours = 0;
@@ -343,21 +345,13 @@ export default function Profile() {
       <View style={styles.header}>
         <View style={styles.profileSection}>
           <View style={styles.profilePictureContainer}>
-            {userProfile?.profilePictureUrl ? (
-              <Image
-                source={{ uri: userProfile.profilePictureUrl }}
-                style={styles.profilePicture}
-              />
-            ) : (
-              <View style={styles.profilePicture}>
-                <Text style={styles.profilePictureText}>
-                  {(() => {
-                    const initials = userProfile?.displayName?.split(' ').map((name: string) => name.charAt(0)).join('').toUpperCase();
-                    return initials || 'U';
-                  })()}
-                </Text>
-              </View>
-            )}
+            <SafeProfileImage
+              uri={userProfile?.profilePictureUrl}
+              displayName={userProfile?.displayName}
+              style={styles.profilePicture}
+              fallbackStyle={styles.profilePicture}
+              textStyle={styles.profilePictureText}
+            />
           </View>
           
           <View style={styles.followContainer}>

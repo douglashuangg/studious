@@ -266,84 +266,107 @@ export const subscribeToCurrentlyStudying = (currentUserId, followingUserIds, ca
       return () => {};
     }
 
-    // Optimized query using 'in' operator for better performance
-    const currentlyStudyingRef = collection(db, 'currentlyStudying');
-    const q = query(
-      currentlyStudyingRef,
-      where('isActive', '==', true),
-      where('userId', 'in', followingUserIds)
-    );
-
-    const unsubscribe = onSnapshot(q, async (snapshot) => {
-      try {
-        const currentlyStudyingUsers = [];
-        
-        // Batch fetch all user data to avoid N+1 queries
-        const userIds = snapshot.docs.map(doc => doc.data().userId);
-        if (userIds.length === 0) {
-          callback([]);
-          return;
-        }
-
-        // Batch fetch user details
-        const userRefs = userIds.map(userId => doc(db, 'users', userId));
-        const userSnaps = await Promise.all(userRefs.map(ref => getDoc(ref)));
-        
-        // Create user data map for O(1) lookup
-        const userDataMap = new Map();
-        userSnaps.forEach((userSnap, index) => {
-          if (userSnap.exists()) {
-            const userData = userSnap.data();
-            userDataMap.set(userIds[index], {
-              displayName: userData.displayName || 'Unknown User',
-              username: userData.username || userData.email?.split('@')[0] || 'user',
-              profilePicture: userData.profilePictureUrl || null,
-              bio: userData.bio || ''
-            });
-          }
-        });
-
-        // Process currently studying users
-        for (const docSnap of snapshot.docs) {
-          const data = docSnap.data();
-          const userData = userDataMap.get(data.userId);
-          
-          if (userData) {
-            currentlyStudyingUsers.push({
-              id: docSnap.id,
-              ...data,
-              startTime: data.startTime?.toDate ? data.startTime.toDate() : new Date(data.startTime),
-              user: {
-                id: data.userId,
-                ...userData
-              }
-            });
-          }
-        }
-
-        // Sort by start time (most recent first)
-        currentlyStudyingUsers.sort((a, b) => {
-          return b.startTime.getTime() - a.startTime.getTime();
-        });
-
-        callback(currentlyStudyingUsers);
-      } catch (error) {
-        const errorResponse = handleError(error, 'subscribeToCurrentlyStudying-dataProcessing');
-        console.error('❌ Error processing currently studying data:', errorResponse);
-        callback([]);
-      }
-    }, (error) => {
-      const errorResponse = handleError(error, 'subscribeToCurrentlyStudying-snapshot');
-      console.error('❌ Error in currently studying subscription:', errorResponse);
-      callback([]);
+    // Since document IDs are userIds, we need to listen to individual documents
+    // Create individual document references for each followed user
+    const documentRefs = followingUserIds.map(userId => doc(db, 'currentlyStudying', userId));
+    
+    // Set up individual listeners for each document
+    const unsubscribes = documentRefs.map(docRef => {
+      return onSnapshot(docRef, (docSnapshot) => {
+        // Process all documents when any one changes
+        processCurrentlyStudyingDocuments(followingUserIds, callback);
+      });
     });
 
-    return unsubscribe;
+    // Initial processing
+    processCurrentlyStudyingDocuments(followingUserIds, callback);
+
+    // Return a function that unsubscribes from all listeners
+    return () => {
+      unsubscribes.forEach(unsubscribe => unsubscribe());
+    };
   } catch (error) {
     const errorResponse = handleError(error, 'subscribeToCurrentlyStudying-setup');
     console.error('❌ Error setting up currently studying subscription:', errorResponse);
     callback([]);
     return () => {};
+  }
+};
+
+// Helper function to process all currently studying documents
+const processCurrentlyStudyingDocuments = async (followingUserIds, callback) => {
+  try {
+    const currentlyStudyingUsers = [];
+    
+    // Get all currently studying documents for followed users
+    const documentPromises = followingUserIds.map(async (userId) => {
+      const docRef = doc(db, 'currentlyStudying', userId);
+      const docSnap = await getDoc(docRef);
+      
+      if (docSnap.exists() && docSnap.data().isActive) {
+        return {
+          userId,
+          data: docSnap.data()
+        };
+      }
+      return null;
+    });
+    
+    const results = await Promise.all(documentPromises);
+    const activeUsers = results.filter(result => result !== null);
+    
+    if (activeUsers.length === 0) {
+      callback([]);
+      return;
+    }
+    
+    // Batch fetch user details
+    const userIds = activeUsers.map(user => user.userId);
+    const userRefs = userIds.map(userId => doc(db, 'users', userId));
+    const userSnaps = await Promise.all(userRefs.map(ref => getDoc(ref)));
+    
+    // Create user data map for O(1) lookup
+    const userDataMap = new Map();
+    userSnaps.forEach((userSnap, index) => {
+      if (userSnap.exists()) {
+        const userData = userSnap.data();
+        userDataMap.set(userIds[index], {
+          displayName: userData.displayName || 'Unknown User',
+          username: userData.username || userData.email?.split('@')[0] || 'user',
+          profilePicture: userData.profilePictureUrl || null,
+          bio: userData.bio || ''
+        });
+      }
+    });
+
+    // Process currently studying users
+    for (const activeUser of activeUsers) {
+      const data = activeUser.data;
+      const userData = userDataMap.get(activeUser.userId);
+      
+      if (userData) {
+        currentlyStudyingUsers.push({
+          id: activeUser.userId,
+          ...data,
+          startTime: data.startTime?.toDate ? data.startTime.toDate() : new Date(data.startTime),
+          user: {
+            id: activeUser.userId,
+            ...userData
+          }
+        });
+      }
+    }
+
+    // Sort by start time (most recent first)
+    currentlyStudyingUsers.sort((a, b) => {
+      return b.startTime.getTime() - a.startTime.getTime();
+    });
+
+    callback(currentlyStudyingUsers);
+  } catch (error) {
+    const errorResponse = handleError(error, 'processCurrentlyStudyingDocuments');
+    console.error('❌ Error processing currently studying documents:', errorResponse);
+    callback([]);
   }
 };
 

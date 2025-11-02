@@ -277,8 +277,16 @@ export default function Record() {
         },
         {
           text: "Discard",
-          onPress: () => {
+          onPress: async () => {
             Alert.alert("Discarded", "Study session discarded.");
+            // Remove currently studying status when discarding
+            if (user) {
+              try {
+                await removeCurrentlyStudying(user.uid);
+              } catch (error) {
+                console.error('Error removing currently studying status:', error);
+              }
+            }
             resetSession();
           },
           style: "destructive"

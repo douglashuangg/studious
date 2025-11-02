@@ -9,13 +9,14 @@ import { useAuth } from "../../contexts/AuthContext";
 import { followUser, unfollowUser, isFollowing as checkIsFollowing, getFollowers, getFollowing } from "../../firebase/followService";
 import { generateRecentDailySummaries } from "../../firebase/dailySummaryService.js";
 import { useLikes } from "../../hooks/useLikes";
+import { SafeProfileImage } from "../../components/SafeProfileImage";
 import LikersModal from "../../components/LikersModal";
 import React from 'react';
 
 export default function ExternalUserProfile() {
   const route = useRoute();
   const navigation = useNavigation();
-  const { id, returnTo, originalReturnTo } = route.params || {};
+  const { id, returnTo, originalReturnTo } = (route.params as any) || {};
   const { user: currentUser, isNewUser } = useAuth();
   
   // State management
@@ -340,15 +341,13 @@ export default function ExternalUserProfile() {
 
       {/* Profile Picture and Info */}
       <View style={styles.profileSection}>
-        {user.profilePictureUrl ? (
-          <Image source={{ uri: user.profilePictureUrl }} style={styles.profilePicture} />
-        ) : (
-          <View style={styles.profilePicture}>
-            <Text style={styles.profilePictureText}>
-              {user.displayName?.split(' ').map(name => name.charAt(0)).join('').toUpperCase() || 'U'}
-            </Text>
-          </View>
-        )}
+        <SafeProfileImage
+          uri={user.profilePictureUrl}
+          displayName={user.displayName}
+          style={styles.profilePicture}
+          fallbackStyle={styles.profilePicture}
+          textStyle={styles.profilePictureText}
+        />
         <Text style={styles.name}>{user.displayName || 'Anonymous User'}</Text>
         <Text style={styles.username}>@{user.username || user.email?.split('@')[0] || 'user'}</Text>
         <Text style={styles.bio}>{user.bio || 'No bio available'}</Text>
@@ -912,10 +911,6 @@ const styles = StyleSheet.create({
     justifyContent: "space-between",
     alignItems: "center",
     marginBottom: 8,
-  },
-  statLabel: {
-    fontSize: 14,
-    color: "#666",
   },
   statValue: {
     fontSize: 14,

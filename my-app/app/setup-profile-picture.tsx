@@ -5,7 +5,7 @@ import { useState } from "react";
 import { useAuth } from "../contexts/AuthContext";
 import { doc, updateDoc } from "firebase/firestore";
 import { db } from "../firebase/firebaseInit";
-import { uploadProfilePicture } from "../firebase/profilePictureService";
+import { uploadProfilePicture, safeUpdateProfilePictureUrl } from "../firebase/profilePictureService";
 import * as ImagePicker from 'expo-image-picker';
 
 export default function SetupProfilePicture() {

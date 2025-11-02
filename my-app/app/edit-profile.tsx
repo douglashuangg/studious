@@ -6,7 +6,7 @@ import { useAuth } from "../contexts/AuthContext";
 import { doc, updateDoc, getDoc, setDoc } from "firebase/firestore";
 import { db } from "../firebase/firebaseInit";
 import * as ImagePicker from 'expo-image-picker';
-import { uploadProfilePicture } from "../firebase/profilePictureService";
+import { uploadProfilePicture, safeUpdateProfilePictureUrl } from "../firebase/profilePictureService";
 
 export default function EditProfile() {
   const navigation = useNavigation();

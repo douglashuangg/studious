@@ -1,34 +1,54 @@
-import * as Notifications from 'expo-notifications';
 import { Platform } from 'react-native';
+import Constants from 'expo-constants';
 
-// Configure how notifications are handled when the app is in the foreground
-Notifications.setNotificationHandler({
-  handleNotification: async () => ({
-    shouldShowAlert: true,
-    shouldPlaySound: true,
-    shouldSetBadge: true,
-  }),
-});
+// Only import and configure notifications if not in Expo Go
+let Notifications = null;
+if (Constants.appOwnership !== 'expo') {
+  Notifications = require('expo-notifications');
+  
+  // Configure how notifications are handled when the app is in the foreground
+  Notifications.setNotificationHandler({
+    handleNotification: async () => ({
+      shouldShowAlert: true,
+      shouldPlaySound: true,
+      shouldSetBadge: true,
+    }),
+  });
+}
 
 export const requestNotificationPermissions = async () => {
-  const { status: existingStatus } = await Notifications.getPermissionsAsync();
-  let finalStatus = existingStatus;
-
-  if (existingStatus !== 'granted') {
-    const { status } = await Notifications.requestPermissionsAsync();
-    finalStatus = status;
-  }
-
-  if (finalStatus !== 'granted') {
-    console.log('Failed to get push token for push notification!');
+  // Check if running in Expo Go (which doesn't support push notifications in SDK 53+)
+  if (Constants.appOwnership === 'expo' || !Notifications) {
     return false;
   }
 
-  return true;
+  try {
+    const { status: existingStatus } = await Notifications.getPermissionsAsync();
+    let finalStatus = existingStatus;
+
+    if (existingStatus !== 'granted') {
+      const { status } = await Notifications.requestPermissionsAsync();
+      finalStatus = status;
+    }
+
+    if (finalStatus !== 'granted') {
+      console.log('Failed to get push token for push notification!');
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.log('Error requesting notification permissions:', error);
+    return false;
+  }
 };
 
 export const getExpoPushToken = async () => {
   try {
+    if (!Notifications) {
+      return null;
+    }
+
     const hasPermission = await requestNotificationPermissions();
     if (!hasPermission) {
       return null;
@@ -46,6 +66,10 @@ export const getExpoPushToken = async () => {
 
 export const scheduleLocalNotification = async (title, body, data = {}) => {
   try {
+    if (!Notifications) {
+      return;
+    }
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title,
@@ -66,6 +90,10 @@ export const scheduleLocalNotification = async (title, body, data = {}) => {
 
 export const scheduleStudyReminder = async (minutesFromNow = 30) => {
   try {
+    if (!Notifications) {
+      return;
+    }
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title: "Study Reminder",
@@ -88,6 +116,10 @@ export const scheduleStudyReminder = async (minutesFromNow = 30) => {
 
 export const scheduleAchievementNotification = async (achievement) => {
   try {
+    if (!Notifications) {
+      return;
+    }
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title: "Achievement Unlocked! 🏆",
@@ -108,6 +140,10 @@ export const scheduleAchievementNotification = async (achievement) => {
 
 export const scheduleFollowNotification = async (followerName) => {
   try {
+    if (!Notifications) {
+      return;
+    }
+
     await Notifications.scheduleNotificationAsync({
       content: {
         title: "New Follower! 👥",
@@ -128,6 +164,10 @@ export const scheduleFollowNotification = async (followerName) => {
 
 export const cancelAllNotifications = async () => {
   try {
+    if (!Notifications) {
+      return;
+    }
+
     await Notifications.cancelAllScheduledNotificationsAsync();
   } catch (error) {
     console.error('Error canceling notifications:', error);
@@ -136,6 +176,10 @@ export const cancelAllNotifications = async () => {
 
 export const getNotificationBadgeCount = async () => {
   try {
+    if (!Notifications) {
+      return 0;
+    }
+
     return await Notifications.getBadgeCountAsync();
   } catch (error) {
     console.error('Error getting badge count:', error);
@@ -145,6 +189,10 @@ export const getNotificationBadgeCount = async () => {
 
 export const setNotificationBadgeCount = async (count) => {
   try {
+    if (!Notifications) {
+      return;
+    }
+
     await Notifications.setBadgeCountAsync(count);
   } catch (error) {
     console.error('Error setting badge count:', error);
